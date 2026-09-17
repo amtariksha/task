@@ -24,6 +24,8 @@ export interface CreateNotificationParams {
   message?: string
   linkUrl?: string
   metadata?: Record<string, any>
+  /** Push/in-app only — e.g. the founder Start push, which must not also email. */
+  skipEmail?: boolean
 }
 
 function mapNotificationTypeToPrefKey(type: string): string | null {
@@ -337,7 +339,9 @@ export async function createNotification(params: CreateNotificationParams): Prom
       commentId,
       taskId,
       bugId,
-      linkUrl
+      linkUrl,
+      // Mobile routes on data.screen when set (e.g. the founder Start push).
+      screen: typeof metadata?.screen === 'string' ? metadata.screen : undefined
     },
     priority: getNotificationPriority(notificationType.startsWith('task_') ? 'task' : (notificationType.startsWith('bug_') ? 'bug' : notificationType))
   }).catch(error => {
@@ -346,9 +350,11 @@ export async function createNotification(params: CreateNotificationParams): Prom
   })
 
   // Send email notification (don't await - fire and forget)
-  sendNotificationEmail(params, notificationType, title, message, linkUrl, metadata).catch(error => {
-    console.error('[createNotification] Failed to send email notification:', error)
-  })
+  if (!params.skipEmail) {
+    sendNotificationEmail(params, notificationType, title, message, linkUrl, metadata).catch(error => {
+      console.error('[createNotification] Failed to send email notification:', error)
+    })
+  }
 
   return result.rows[0]?.notification_id || ''
 }

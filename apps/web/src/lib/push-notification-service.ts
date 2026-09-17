@@ -13,7 +13,8 @@ export interface PushNotificationPayload {
   body: string
   data?: {
     notificationId?: string
-    type?: 'task' | 'bug' | 'leave' | 'wfh' | 'feed' | 'mention' | 'comment' | 'reaction'
+    type?: 'task' | 'bug' | 'leave' | 'wfh' | 'feed' | 'mention' | 'comment' | 'reaction' | 'founder_start'
+    screen?: string
     taskId?: string
     bugId?: string
     leaveId?: string
@@ -141,6 +142,7 @@ export function getNotificationPriority(type?: string): 'default' | 'normal' | '
       return 'high'
     case 'leave':
     case 'wfh':
+    case 'founder_start':
       return 'high'
     default:
       return 'default'

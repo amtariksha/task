@@ -169,6 +169,17 @@ export async function getStartSettings(): Promise<StartSettings> {
   return parseSettings(result.rows[0]?.value)
 }
 
+/** Create the platform-level row with defaults when missing; never touches an existing row. */
+export async function ensureStartSettings(createdBy: string): Promise<StartSettings> {
+  await getPool().query(
+    `INSERT INTO settings (key, value, description, is_active, created_by, company_id)
+     VALUES ($1, $2::jsonb, 'Founder Start push schedule (09:00 IST)', true, $3, NULL)
+     ON CONFLICT (key) WHERE company_id IS NULL DO NOTHING`,
+    [SETTINGS_KEY, JSON.stringify(DEFAULT_START_SETTINGS), createdBy]
+  )
+  return getStartSettings()
+}
+
 /**
  * Create the platform-level row if missing, then shallow-merge `patch` into it
  * in SQL (so a concurrent lastSentDate claim is never overwritten).
