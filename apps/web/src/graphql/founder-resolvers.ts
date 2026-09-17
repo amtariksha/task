@@ -26,6 +26,7 @@ import {
   type CloseoutEntry,
 } from '@/lib/db/founder-writes'
 import { getStartSettings, upsertStartSettings, type StartSettings } from '@/lib/db/founder-start-data'
+import { CRON_PUSH_HOUR_IST, CRON_PUSH_MINUTE_IST, isCronPushTime } from '@/lib/founder/push-schedule'
 
 const MAX_LABEL = 120
 const MAX_TEXT = 2000
@@ -118,10 +119,17 @@ function toSettingsPatch(args: Args): Partial<StartSettings> {
   if (pausedUntil && !ISO_DATE.test(pausedUntil)) {
     throw new FounderInputError('pausedUntil must be a YYYY-MM-DD date.')
   }
+  const hour = args.hour !== undefined && args.hour !== null ? toIntInRange(args.hour, 'hour', 0, 23) : undefined
+  const minute = args.minute !== undefined && args.minute !== null ? toIntInRange(args.minute, 'minute', 0, 59) : undefined
+  // One daily cron (vercel.json) sends the push; any other stored time would only mislead or skip it.
+  if ((hour !== undefined || minute !== undefined)
+    && !isCronPushTime(hour ?? CRON_PUSH_HOUR_IST, minute ?? CRON_PUSH_MINUTE_IST)) {
+    throw new FounderInputError(`The Start push time is fixed at ${String(CRON_PUSH_HOUR_IST).padStart(2, '0')}:${String(CRON_PUSH_MINUTE_IST).padStart(2, '0')} IST by the daily cron; change vercel.json to move it.`)
+  }
   return {
     ...(typeof args.enabled === 'boolean' ? { enabled: args.enabled } : {}),
-    ...(args.hour !== undefined && args.hour !== null ? { hour: toIntInRange(args.hour, 'hour', 0, 23) } : {}),
-    ...(args.minute !== undefined && args.minute !== null ? { minute: toIntInRange(args.minute, 'minute', 0, 59) } : {}),
+    ...(hour !== undefined ? { hour } : {}),
+    ...(minute !== undefined ? { minute } : {}),
     ...(pausedUntil !== undefined ? { pausedUntil } : {}),
   }
 }
