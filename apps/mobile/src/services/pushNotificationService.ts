@@ -35,7 +35,8 @@ try {
 export interface PushNotificationData {
   [key: string]: string | undefined
   notificationId?: string
-  type?: 'task' | 'bug' | 'leave' | 'wfh' | 'feed' | 'mention' | 'comment' | 'reaction'
+  type?: 'task' | 'bug' | 'leave' | 'wfh' | 'feed' | 'mention' | 'comment' | 'reaction' | 'founder_start'
+  screen?: string
   taskId?: string
   bugId?: string
   leaveId?: string

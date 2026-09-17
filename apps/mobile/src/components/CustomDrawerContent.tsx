@@ -19,9 +19,11 @@ interface NavigationItem {
 interface CustomDrawerContentProps {
   visible: boolean
   onClose: () => void
+  /** App's flag (the one that registers FounderStart), so the drawer never shows a stale Start item. */
+  isFounder?: boolean
 }
 
-export default function CustomDrawerContent({ visible, onClose }: CustomDrawerContentProps) {
+export default function CustomDrawerContent({ visible, onClose, isFounder = false }: CustomDrawerContentProps) {
   const navigation = useNavigation<any>()
   const { signOut } = React.useContext(AuthContext)
   const [currentUser, setCurrentUser] = useState<any>(null)
@@ -65,6 +67,8 @@ export default function CustomDrawerContent({ visible, onClose }: CustomDrawerCo
       ))}
     </View>
   )
+
+  const founderStartItem: NavigationItem = { screen: 'FounderStart', label: 'Start', icon: 'weather-sunset-up' }
 
   // Navigation Sections matching WebApp
   const homeItems: NavigationItem[] = [
@@ -221,6 +225,20 @@ export default function CustomDrawerContent({ visible, onClose }: CustomDrawerCo
 
             {/* Navigation Items */}
             <View style={styles.navigationSection}>
+              {isFounder && (
+                <>
+                  <List.Item
+                    title={founderStartItem.label}
+                    left={(props) => <List.Icon {...props} icon={founderStartItem.icon} color={colors.primary} />}
+                    onPress={() => handleNavigation(founderStartItem)}
+                    style={styles.navItem}
+                    titleStyle={styles.navItemTitle}
+                    accessibilityRole="button"
+                    accessibilityLabel="Open Start"
+                  />
+                  <Divider style={styles.divider} />
+                </>
+              )}
               {renderSection(homeItems)}
 
               <Divider style={styles.divider} />
