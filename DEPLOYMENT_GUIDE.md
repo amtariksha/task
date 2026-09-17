@@ -1,12 +1,13 @@
 # JSR Task Management - Deployment Guide
 
 **Version:** 1.0  
-**Last Updated:** 2025-11-12  
+**Last Updated:** 2026-09-17  
 **Document Owner:** JSR Development Team
 
 ---
 
 ## Changelog
+- **2026-09-17**: Added Push Notifications (Expo / FCM) section — optional `EXPO_ACCESS_TOKEN`, enhanced push security, FCM V1 service-account key
 - **2025-11-12**: Initial Deployment Guide creation - Complete deployment instructions for web app, mobile app, database, S3, email, and monitoring
 
 ---
@@ -19,11 +20,12 @@
 5. [Database Setup (Supabase)](#database-setup-supabase)
 6. [File Storage (AWS S3)](#file-storage-aws-s3)
 7. [Email Service (Gmail SMTP)](#email-service-gmail-smtp)
-8. [Environment Variables](#environment-variables)
-9. [CI/CD Pipeline](#cicd-pipeline)
-10. [Monitoring and Logging](#monitoring-and-logging)
-11. [Rollback Procedures](#rollback-procedures)
-12. [Troubleshooting](#troubleshooting)
+8. [Push Notifications (Expo / FCM)](#push-notifications-expo--fcm)
+9. [Environment Variables](#environment-variables)
+10. [CI/CD Pipeline](#cicd-pipeline)
+11. [Monitoring and Logging](#monitoring-and-logging)
+12. [Rollback Procedures](#rollback-procedures)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -160,6 +162,9 @@ AWS_S3_BUCKET=amtariksha
 
 # Optional: Redis (for caching)
 REDIS_URL=redis://default:[password]@[host]:6379
+
+# Optional: Expo push access token (REQUIRED once enhanced push security is on)
+EXPO_ACCESS_TOKEN=
 ```
 
 **Important:**
@@ -678,6 +683,75 @@ Email templates are in `apps/web/public/`:
 
 ---
 
+## Push Notifications (Expo / FCM)
+
+**Last Updated:** 2026-09-17
+
+The web app sends pushes through the Expo Push API
+(`https://exp.host/--/api/v2/push/send`, see `apps/web/src/lib/push-notification-service.ts`).
+Expo forwards them to FCM (Android) and APNs (iOS). Device tokens are stored in
+the `push_tokens` table. Server logs only show a masked prefix
+(`ExponentPushToken[abcdef…]`), never the full token.
+
+### Step 1: Expo access token (`EXPO_ACCESS_TOKEN`) — optional
+
+- When `EXPO_ACCESS_TOKEN` is set, every push request sends
+  `Authorization: Bearer <EXPO_ACCESS_TOKEN>`. When it is unset or blank, no
+  header is sent, which was the behaviour before this setting existed.
+- Create the token in the Expo account that owns the project (currently
+  `whokevalshah`, see `owner` in `apps/mobile/app.json`): **expo.dev → Account
+  settings → Access tokens**. A robot-user token is best, so the token does not
+  depend on one person's login.
+- Add it in Vercel (**Settings → Environment Variables**) for Production and
+  Preview, then redeploy. `scripts/test-remote-push.js` reads the same variable
+  from `apps/web/.env.local`.
+
+> **Enhanced Security for Push Notifications.** The same Expo settings page can
+> make the push API accept only requests that carry a valid access token. Once
+> it is on, requests without the token fail with `UNAUTHORIZED`, so every push
+> from the app stops until the token is set. Order of operations:
+> 1. Set `EXPO_ACCESS_TOKEN` in Vercel.
+> 2. Redeploy.
+> 3. Send a test push and confirm it arrives.
+> 4. Only then turn on enhanced security.
+>
+> Before you revoke or rotate the token, deploy the new value first.
+
+### Step 2: Android credentials (FCM V1 service-account key)
+
+Android delivery needs an FCM V1 service-account key uploaded to Expo for the
+application identifier `com.karmayog`. It must come from the same Firebase
+project as `apps/mobile/android/app/google-services.json` (`karmayog-task`,
+project number `242622641703`). Without it, Expo returns credential errors such
+as `Unable to retrieve the FCM server key for the recipient's app`.
+
+1. Firebase console → project `karmayog-task` → **Project settings → Service
+   accounts** → **Generate new private key**. Keep the JSON file out of git.
+2. Upload it with **either** of these:
+   - `cd apps/mobile && eas credentials` → Android → production →
+     Google Service Account → *Manage your Google Service Account Key for Push
+     Notifications (FCM V1)* → *Upload a new service account key*
+   - expo.dev → project → **Credentials** → Android → `com.karmayog` →
+     **Service Credentials → FCM V1 service account key** → upload
+3. If you use an existing service account instead, give it the **Firebase Cloud
+   Messaging API Admin** role in Google Cloud IAM.
+
+See [docs/PUSH_NOTIFICATIONS_SETUP.md](docs/PUSH_NOTIFICATIONS_SETUP.md) for
+the full checklist and the 2026-09-17 push test findings.
+
+### Step 3: Expo push errors
+
+The server reads the push tickets Expo returns with each send. It does not poll
+push receipts, so errors that Expo reports only in receipts are not logged.
+
+| `details.error` | Meaning | What the server does |
+|---|---|---|
+| `DeviceNotRegistered` | The device can no longer receive pushes (Expo documents this as permanent) | Marks the token inactive |
+| `InvalidCredentials`, `MismatchSenderId` | FCM/APNs credentials problem in the Expo project | Logs the error. The token stays active and works again once the credentials are fixed |
+| `MessageTooBig`, `MessageRateExceeded` | Payload too large, or too many pushes to one device | Logs the error only |
+
+---
+
 ## Environment Variables
 
 **Last Updated:** 2025-11-12
@@ -706,6 +780,9 @@ AWS_S3_BUCKET=amtariksha
 
 # Optional: Redis (for caching)
 REDIS_URL=redis://default:[password]@redis-12345.c1.ap-south-1-1.ec2.cloud.redislabs.com:6379
+
+# Optional: Expo push access token (REQUIRED once enhanced push security is on)
+EXPO_ACCESS_TOKEN=
 ```
 
 ### Development Environment Variables
@@ -728,6 +805,9 @@ AWS_ACCESS_KEY_ID=AKIA2JGJ2OTO4M3JH6MR
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=ap-south-1
 AWS_S3_BUCKET=amtariksha-dev
+
+# Optional: Expo push access token (also read by scripts/test-remote-push.js)
+EXPO_ACCESS_TOKEN=
 ```
 
 ### Security Best Practices
