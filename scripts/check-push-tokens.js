@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+const { maskPushToken } = require('./lib/push-token-mask');
 
 // Load environment variables
 const envPath = path.join(__dirname, '..', 'apps', 'web', '.env.local');
@@ -42,7 +43,7 @@ async function main() {
             console.log("ℹ️ No push tokens found for this user in the database.");
         } else {
             console.log(`\n🔔 Registered Push Tokens (${res.rows.length}):`);
-            console.table(res.rows);
+            console.table(res.rows.map((row) => ({ ...row, push_token: maskPushToken(row.push_token) })));
         }
         
     } catch (err) {

@@ -5,8 +5,13 @@
  */
 
 import { getPool } from '@/lib/db'
+import { maskPushToken, redactPushTokens } from '@/lib/expo-push'
 
 const getPoolInstance = () => getPool()
+
+// pg errors can echo column values (constraint DETAIL), so tokens are masked before logging.
+const describeError = (error: any): string =>
+  redactPushTokens([error?.stack ?? String(error), error?.detail].filter(Boolean).join(' | '))
 
 export const pushTokenMutations = {
   /**
@@ -61,8 +66,8 @@ export const pushTokenMutations = {
       console.log(`[registerPushToken] Registered push token for user ${userId}, device: ${deviceType}`)
       return true
     } catch (error: any) {
-      console.error('[registerPushToken] Error:', error)
-      throw new Error(`Failed to register push token: ${error.message}`)
+      console.error('[registerPushToken] Error:', describeError(error))
+      throw new Error(`Failed to register push token: ${redactPushTokens(String(error?.message))}`)
     }
   },
 
@@ -102,8 +107,8 @@ export const pushTokenMutations = {
       console.log(`[unregisterPushToken] Unregistered push token for user ${userId}`)
       return true
     } catch (error: any) {
-      console.error('[unregisterPushToken] Error:', error)
-      throw new Error(`Failed to unregister push token: ${error.message}`)
+      console.error('[unregisterPushToken] Error:', describeError(error))
+      throw new Error(`Failed to unregister push token: ${redactPushTokens(String(error?.message))}`)
     }
   }
 }
@@ -123,7 +128,7 @@ export async function getActivePushTokens(userId: string): Promise<string[]> {
 
     return result.rows.map((row: any) => row.push_token)
   } catch (error: any) {
-    console.error('[getActivePushTokens] Error:', error)
+    console.error('[getActivePushTokens] Error:', describeError(error))
     return []
   }
 }
@@ -141,9 +146,9 @@ export async function markPushTokenInvalid(pushToken: string): Promise<void> {
       [pushToken]
     )
 
-    console.log(`[markPushTokenInvalid] Marked token as invalid: ${pushToken.substring(0, 20)}...`)
+    console.log(`[markPushTokenInvalid] Marked token as invalid: ${maskPushToken(pushToken)}`)
   } catch (error: any) {
-    console.error('[markPushTokenInvalid] Error:', error)
+    console.error('[markPushTokenInvalid] Error:', describeError(error))
   }
 }
 

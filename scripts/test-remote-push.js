@@ -18,6 +18,7 @@
 const fs = require('fs');
 const path = require('path');
 const { Client } = require('pg');
+const { maskPushToken, redactPushTokens } = require('./lib/push-token-mask');
 
 // 1. Load env variables
 const envPath = path.join(__dirname, '..', 'apps', 'web', '.env.local');
@@ -62,7 +63,7 @@ async function main() {
 
         console.log(`📱 Found ${res.rows.length} active device(s) for Keval:`);
         res.rows.forEach((row, i) => {
-            console.log(`   [${i+1}] Device: ${row.device_id} (${row.device_type}) | Token: ${row.push_token.substring(0, 30)}...`);
+            console.log(`   [${i+1}] Device: ${row.device_id} (${row.device_type}) | Token: ${maskPushToken(row.push_token)}`);
         });
 
         // Prepare messages for the Expo Push API (which proxies to FCM/APNs)
@@ -82,12 +83,16 @@ async function main() {
         }));
 
         console.log(`\n🚀 Transmitting push request to Expo Push Service...`);
+        // Required once "enhanced push security" is enabled on the Expo project;
+        // mirrors buildExpoPushHeaders in apps/web/src/lib/expo-push.ts.
+        const accessToken = (process.env.EXPO_ACCESS_TOKEN || '').trim();
         const response = await fetch(EXPO_PUSH_API_URL, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Accept-Encoding': 'gzip, deflate',
                 'Content-Type': 'application/json',
+                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
             },
             body: JSON.stringify(messages),
         });
@@ -98,12 +103,12 @@ async function main() {
 
         const result = await response.json();
         console.log('✅ Response received from Expo:');
-        console.log(JSON.stringify(result, null, 2));
+        console.log(redactPushTokens(JSON.stringify(result, null, 2)));
 
         if (result.data && result.data[0] && result.data[0].status === 'ok') {
             console.log('\n🎉 Push notification queued successfully! Check your physical device notification panel now.');
         } else {
-            console.error('\n❌ Failed to queue push notification:', result);
+            console.error('\n❌ Failed to queue push notification:', redactPushTokens(JSON.stringify(result)));
         }
 
     } catch (err) {
