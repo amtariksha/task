@@ -37,15 +37,24 @@ map_label() {
     "$MAP_FILE" 2>/dev/null
 }
 
-# A session started in a sub-directory or a git worktree still belongs to the
-# main checkout, so try that checkout's name before the literal cwd name.
-repo_candidates() {
-  local cwd="$1" common_dir
-  common_dir="$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+# The main checkout's directory (also for a sub-directory or a git worktree),
+# or nothing outside a git repo.
+checkout_root() {
+  local common_dir
+  common_dir="$(git -C "$1" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
   if [[ "$common_dir" == */.git ]]; then
-    basename "$(dirname "$common_dir")"
+    dirname "$common_dir"
   fi
+}
+
+# Map keys to try, in order: the checkout's name, the cwd's name, then the name
+# of the folder holding the checkout, so one key such as "amtarikshadev-Swarg"
+# covers every repo nested inside that folder.
+repo_candidates() {
+  local cwd="$1" root="$2"
+  [[ -z "$root" ]] || basename "$root"
   basename "$cwd"
+  [[ -z "$root" ]] || basename "$(dirname "$root")"
 }
 
 # A readable prefix plus a hash of the whole label: different labels never share a
@@ -77,16 +86,16 @@ main() {
   command -v jq >/dev/null 2>&1 || { log 'jq is not installed'; return 0; }
   [[ -r "$MAP_FILE" ]] || { log "map not found: $MAP_FILE"; return 0; }
 
-  local cwd repo="" label="" candidate
+  local cwd root repo label="" candidate
   cwd="$(read_hook_cwd)"
   [[ -d "$cwd" ]] || { log "cwd is not a directory: $cwd"; return 0; }
+  root="$(checkout_root "$cwd")"
+  # The post names the repo actually worked in, even when a parent folder's key matched.
+  repo="$(basename "${root:-$cwd}")"
   while IFS= read -r candidate; do
     label="$(map_label "$candidate")"
-    if [[ -n "$label" ]]; then
-      repo="$candidate"
-      break
-    fi
-  done < <(repo_candidates "$cwd")
+    [[ -z "$label" ]] || break
+  done < <(repo_candidates "$cwd" "$root")
   [[ -n "$label" ]] || { log "no founder-map entry for $cwd"; return 0; }
 
   local marker

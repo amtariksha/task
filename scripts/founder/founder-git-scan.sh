@@ -3,6 +3,9 @@
 # in founder-map.json, posts "<n> commits: <latest three subjects>" for the
 # founder's own commits since the last successful scan of that repo (first run:
 # the last 24 hours; never more than 7 days) to the mapped founder thread.
+# A folder that is not a repo itself is searched one level down: each nested
+# repo matches by its own name, else by the folder's name, and its post is
+# prefixed with "<repo>: ".
 # Per-repo failures never stop the scan; the script exits 0 and logs a one-line
 # summary to stderr.
 set -uo pipefail
@@ -89,7 +92,7 @@ build_summary() {
 
 # Prints posted | quiet | failed.
 scan_repo() {
-  local dir="$1" label="$2" ingest="$3" started_at state since since_iso commits
+  local dir="$1" label="$2" ingest="$3" prefix="$4" started_at state since since_iso commits
   local -a authors=()
   mapfile -t authors < <(author_args "$dir")
   if (( ${#authors[@]} == 0 )); then
@@ -116,7 +119,7 @@ scan_repo() {
   count=$(( $(wc -l <<<"$commits") ))
   latest="$(cut -f1 <<<"$commits" | sort | tail -n 1)"
   subjects="$(cut -f2- <<<"$commits")"
-  summary="$(build_summary "$count" "$subjects")"
+  summary="${prefix}$(build_summary "$count" "$subjects")"
   if FOUNDER_INGEST_STRICT=1 "$ingest" "$label" "$summary" "$latest" </dev/null >/dev/null; then
     mark_scanned "$state" "$started_at"
     echo posted
@@ -124,6 +127,24 @@ scan_repo() {
     log "${dir##*/}: posting to \"$label\" failed"
     echo failed
   fi
+}
+
+# One repo: its own map key first, then (for nested repos) the parent folder's key.
+scan_candidate() {
+  local dir="$1" parent="$2" ingest="$3" name label prefix=""
+  name="${dir##*/}"
+  label="$(map_label "$name")"
+  if [[ -z "$label" && -n "$parent" ]]; then
+    label="$(map_label "$parent")"
+  fi
+  [[ -n "$label" ]] || return 0
+  [[ -z "$parent" ]] || prefix="$name: "
+  scanned=$((scanned + 1))
+  case "$(scan_repo "$dir" "$label" "$ingest" "$prefix")" in
+    posted) posted=$((posted + 1)) ;;
+    quiet) quiet=$((quiet + 1)) ;;
+    *) failed=$((failed + 1)) ;;
+  esac
 }
 
 main() {
@@ -137,19 +158,19 @@ main() {
   ingest="$(script_dir)/founder-ingest.sh"
   [[ -x "$ingest" ]] || { log "not executable: $ingest"; return 0; }
 
-  local scanned=0 posted=0 quiet=0 failed=0 dir label result
+  # Counters live here; scan_candidate updates them (bash dynamic scoping).
+  local scanned=0 posted=0 quiet=0 failed=0 dir child
   for dir in "$PROJECTS_DIR"/*/; do
     dir="${dir%/}"
-    [[ -e "$dir/.git" ]] || continue
-    label="$(map_label "${dir##*/}")"
-    [[ -n "$label" ]] || continue
-    scanned=$((scanned + 1))
-    result="$(scan_repo "$dir" "$label" "$ingest")"
-    case "$result" in
-      posted) posted=$((posted + 1)) ;;
-      quiet) quiet=$((quiet + 1)) ;;
-      *) failed=$((failed + 1)) ;;
-    esac
+    if [[ -e "$dir/.git" ]]; then
+      scan_candidate "$dir" "" "$ingest"
+      continue
+    fi
+    for child in "$dir"/*/; do
+      child="${child%/}"
+      [[ -e "$child/.git" ]] || continue
+      scan_candidate "$child" "${dir##*/}" "$ingest"
+    done
   done
   log "scanned $scanned mapped repos in $PROJECTS_DIR: $posted posted, $quiet without commits, $failed failed"
 }

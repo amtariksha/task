@@ -10,7 +10,7 @@ an `activity` check-in with `source = hook`.
 | --- | --- |
 | `founder-ingest.sh "<label>" "<summary>" [occurredAt]` | Posts one entry. Every other script calls it. |
 | `founder-claude-stop-hook.sh` | Claude Code `Stop` hook. It posts `Claude Code session in <repo>`, and appends ` · last commit: <subject>` when the last commit is less than 2 hours old. |
-| `founder-git-scan.sh` | Nightly scan. For each mapped repo with your commits since its last successful scan, it posts `<n> commits: <latest three subjects joined with "; ">`. |
+| `founder-git-scan.sh` | Nightly scan. For each mapped repo with your commits since its last successful scan, it posts `<n> commits: <latest three subjects joined with "; ">` (prefixed with `<repo>: ` for repos nested in a project folder). |
 | `systemd/founder-git-scan.{service,timer}` | systemd user units. They run the scan every day at 18:00 UTC (23:30 IST). |
 
 All three scripts:
@@ -64,12 +64,28 @@ systemctl --user daemon-reload && systemctl --user enable --now founder-git-scan
 
 Map keys are directory **basenames**. Labels are matched case-insensitively
 against existing thread labels. **An unknown label creates a new thread**, so
-spell labels exactly as they appear on Start.
+spell labels exactly as they appear on Start. A new thread is linked to a
+Karmayog project automatically only when its label matches exactly one
+project name (case-insensitive), e.g. `Swarg`.
 
-The nightly scan only looks at directories directly under the projects
-directory that contain `.git`. A folder that only holds nested repos (for
-example `/mnt/work/projects/amtarikshadev-Swarg`) is not scanned. The Stop
-hook still matches a session started in exactly that folder by its name.
+A key can also be a **project folder that holds several repos** (for example
+`/mnt/work/projects/amtarikshadev-Swarg`, which contains `swargnodejsbackend`,
+`swargdeliveryapp`, …). A repo nested one level inside such a folder is matched
+by its own name first, then by the folder's name, so one entry covers the whole
+folder. This also keeps repos with the same name in different folders apart
+(e.g. `communityos` under both `ezcondo` and `amtariksha-project3-communityOS`).
+
+Example for a machine with that layout:
+
+```json
+{
+  "task": "Karmayog",
+  "nisarg": "Nisarg",
+  "amtarikshadev-Swarg": "Swarg",
+  "eassy": "EassyLife",
+  "ezcondo": "EzCondo"
+}
+```
 
 The scripts are **copies**, not symlinks. A symlink into the checkout breaks as
 soon as you switch to a branch without `scripts/founder/`, and the Stop hook
@@ -93,15 +109,22 @@ hook looks up the repo name in the map in this order:
 1. The main checkout's directory name. This covers sessions started in a
    sub-directory or a git worktree.
 2. `basename(cwd)`.
+3. The name of the folder that contains the checkout (a project folder such
+   as `amtarikshadev-Swarg`).
 
-If neither name is in the map, the hook does nothing.
+The post always names the repo you worked in.
+
+If none of these names is in the map, the hook does nothing.
 
 The HTTP call runs detached with `nohup`, so the hook returns in about 0.1 s.
 
 ### Nightly scan
 
-The scan covers every directory in `${FOUNDER_PROJECTS_DIR:-/mnt/work/projects}`
-that has a `.git` entry and a key in the map. For each repo it runs
+The scan covers every repo directly in `${FOUNDER_PROJECTS_DIR:-/mnt/work/projects}`
+and, for folders there that are not repos themselves, every repo one level
+inside them; a repo is scanned when its own name or (for nested repos) its
+folder's name is a key in the map. Posts for nested repos start with
+`<repo>: `. For each repo it runs
 `git log --all` over **your** commits only:
 
 - **Authors:** the repo's `git config user.email`, plus any emails in
