@@ -3,6 +3,7 @@ import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
 import {
+  buildExpoPushHeaders,
   isPermanentTokenError,
   maskPushToken,
   redactPushTokens,
@@ -55,6 +56,34 @@ for (const [name, mask] of implementations) {
     })
   })
 }
+
+describe('Expo push request headers', () => {
+  test('omits Authorization when no access token is configured', () => {
+    for (const token of [undefined, '', '   ']) {
+      const headers = buildExpoPushHeaders(token)
+      assert.equal(headers.Authorization, undefined)
+      assert.equal(headers['Content-Type'], 'application/json')
+      assert.equal(headers.Accept, 'application/json')
+    }
+  })
+
+  test('sends the trimmed access token as a bearer header', () => {
+    assert.equal(buildExpoPushHeaders('  expo-token-123\n').Authorization, 'Bearer expo-token-123')
+  })
+
+  test('reads EXPO_ACCESS_TOKEN by default', () => {
+    const previous = process.env.EXPO_ACCESS_TOKEN
+    try {
+      process.env.EXPO_ACCESS_TOKEN = 'from-env'
+      assert.equal(buildExpoPushHeaders().Authorization, 'Bearer from-env')
+      delete process.env.EXPO_ACCESS_TOKEN
+      assert.equal(buildExpoPushHeaders().Authorization, undefined)
+    } finally {
+      if (previous === undefined) delete process.env.EXPO_ACCESS_TOKEN
+      else process.env.EXPO_ACCESS_TOKEN = previous
+    }
+  })
+})
 
 describe('token deactivation', () => {
   test('only DeviceNotRegistered is permanent', () => {

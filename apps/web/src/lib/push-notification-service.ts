@@ -5,9 +5,13 @@
  */
 
 import { getActivePushTokens, markPushTokenInvalid } from '@/graphql/push-token-resolvers'
-import { isPermanentTokenError, maskPushToken, redactPushTokens } from '@/lib/expo-push'
-
-const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send'
+import {
+  EXPO_PUSH_API_URL,
+  buildExpoPushHeaders,
+  isPermanentTokenError,
+  maskPushToken,
+  redactPushTokens,
+} from '@/lib/expo-push'
 
 export interface PushNotificationPayload {
   title: string
@@ -64,11 +68,7 @@ export async function sendPushNotification(
     // Send to Expo Push API
     const response = await fetch(EXPO_PUSH_API_URL, {
       method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Accept-Encoding': 'gzip, deflate',
-        'Content-Type': 'application/json',
-      },
+      headers: buildExpoPushHeaders(),
       body: JSON.stringify(messages),
     })
 

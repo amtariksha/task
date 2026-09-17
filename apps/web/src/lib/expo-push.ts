@@ -2,6 +2,8 @@
 // scripts/lib/push-token-mask.js mirrors maskPushToken/redactPushTokens for the
 // plain-node scripts; expo-push.test.mjs keeps the two in step.
 
+export const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send'
+
 const VISIBLE_TOKEN_CHARS = 6
 const EXPO_TOKEN_PATTERN = /(Expo(?:nent)?PushToken\[)([^\]]*)\]/g
 
@@ -19,6 +21,20 @@ export function maskPushToken(token: string | null | undefined): string {
 /** Masks every Expo push token inside free text, e.g. a DeviceNotRegistered ticket message. */
 export function redactPushTokens(text: string): string {
   return text.replace(EXPO_TOKEN_PATTERN, (token) => maskPushToken(token))
+}
+
+/**
+ * With "enhanced push security" enabled on the Expo project, requests without
+ * this bearer token fail with UNAUTHORIZED; without it enabled the header is optional.
+ */
+export function buildExpoPushHeaders(accessToken = process.env.EXPO_ACCESS_TOKEN): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    'Accept-Encoding': 'gzip, deflate',
+    'Content-Type': 'application/json',
+  }
+  const trimmedToken = accessToken?.trim()
+  return trimmedToken ? { ...headers, Authorization: `Bearer ${trimmedToken}` } : headers
 }
 
 /**

@@ -83,12 +83,16 @@ async function main() {
         }));
 
         console.log(`\n🚀 Transmitting push request to Expo Push Service...`);
+        // Required once "enhanced push security" is enabled on the Expo project;
+        // mirrors buildExpoPushHeaders in apps/web/src/lib/expo-push.ts.
+        const accessToken = (process.env.EXPO_ACCESS_TOKEN || '').trim();
         const response = await fetch(EXPO_PUSH_API_URL, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',
                 'Accept-Encoding': 'gzip, deflate',
                 'Content-Type': 'application/json',
+                ...(accessToken ? { 'Authorization': `Bearer ${accessToken}` } : {}),
             },
             body: JSON.stringify(messages),
         });
