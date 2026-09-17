@@ -1,0 +1,8 @@
+[Unit]
+Description=Karmayog founder: post new git commits (since the last scan) to Start threads
+
+[Service]
+Type=oneshot
+ExecStart=%h/.config/karmayog/founder-git-scan.sh
+Nice=10
+TimeoutStartSec=10min
