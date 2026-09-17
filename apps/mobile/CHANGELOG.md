@@ -29,6 +29,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] — 2026-09-17
+
+### Added
+- **Start** (founder accounts only): the app opens on a daily Start
+  screen with your Top 3 threads, every other thread and how long since
+  it was touched, items waiting on you, and Claude's notes.
+- 60-second end-of-day close-out, weekly thread ranking, pausing the
+  morning Start notification, and parking threads.
+- A 09:00 IST Start notification that opens the Start screen.
+
+Nothing changes for other accounts.
+
+---
+
 ## [1.0.0] — Initial release
 
 First release of Karmayog. Includes:
