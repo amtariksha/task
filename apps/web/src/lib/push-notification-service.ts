@@ -5,6 +5,7 @@
  */
 
 import { getActivePushTokens, markPushTokenInvalid } from '@/graphql/push-token-resolvers'
+import { isPermanentTokenError, maskPushToken, redactPushTokens } from '@/lib/expo-push'
 
 const EXPO_PUSH_API_URL = 'https://exp.host/--/api/v2/push/send'
 
@@ -82,10 +83,13 @@ export async function sendPushNotification(
       for (let i = 0; i < result.data.length; i++) {
         const ticket = result.data[i]
         if (ticket.status === 'error') {
-          console.error(`[sendPushNotification] Error for token ${pushTokens[i]}:`, ticket.message)
-          
-          // Mark token as invalid if it's a DeviceNotRegistered error
-          if (ticket.details?.error === 'DeviceNotRegistered') {
+          const errorCode = ticket.details?.error
+          console.error(
+            `[sendPushNotification] Error for token ${maskPushToken(pushTokens[i])}${errorCode ? ` (${errorCode})` : ''}:`,
+            redactPushTokens(String(ticket.message ?? ''))
+          )
+
+          if (isPermanentTokenError(errorCode)) {
             await markPushTokenInvalid(pushTokens[i])
           }
         }
