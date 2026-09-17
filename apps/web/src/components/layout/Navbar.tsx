@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
+import { useQuery } from '@apollo/client/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { logout, getCurrentUser, getRoleDisplayName } from '@/lib/auth'
@@ -10,6 +11,7 @@ import { User as UserType } from '@/lib/types'
 import { hasTabAccess } from '@/lib/permissions'
 import NotificationBell from './NotificationBell'
 import { useProjectFilter } from '@/contexts/ProjectFilterContext'
+import { ME_IS_FOUNDER } from '@/lib/founder-queries'
 import {
   Menu,
   X,
@@ -37,8 +39,11 @@ import {
   ChevronLeft,
   ChevronRight,
   Sun,
-  Moon
+  Moon,
+  Sunrise
 } from 'lucide-react'
+
+interface MeIsFounderData { me: { employeeId: string; isFounder: boolean | null } | null }
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
@@ -87,6 +92,15 @@ export default function Navbar() {
     setIsDark(document.documentElement.classList.contains('dark'))
   }, [])
 
+  // The stored login user only knows isPlatformAdmin; founders listed in
+  // FOUNDER_EMPLOYEE_IDS are known to the server alone, so ask it (once per session).
+  const { data: founderData } = useQuery<MeIsFounderData>(ME_IS_FOUNDER, {
+    skip: !currentUser || currentUser.isPlatformAdmin === true,
+    fetchPolicy: 'cache-first',
+  })
+  const showFounderStart = currentUser?.isPlatformAdmin === true
+    || (founderData?.me?.isFounder === true && founderData.me.employeeId === currentUser?.employeeId)
+
   const toggleTheme = () => {
     const newTheme = !isDark
     setIsDark(newTheme)
@@ -122,6 +136,7 @@ export default function Navbar() {
       icon: Briefcase,
       key: 'work_group', // Virtual key for grouping
       children: [
+        { label: 'Start', href: '/start', icon: Sunrise, key: 'founder_start' },
         { label: 'Dashboard', href: '/dashboard', icon: Briefcase, key: 'home' }, // Dashboard usually accessible with home or specific key
         { label: 'Your Work', href: '/your-work', icon: ListTodo, key: 'your_work' },
         { label: 'Team Tasks', href: '/team-tasks', icon: Users, key: 'team_tasks' },
@@ -171,7 +186,10 @@ export default function Navbar() {
       const filteredChildren = item.children.filter(child =>
         // 'requirements' is visible to every authenticated user (project-level
         // access is enforced on the page). Otherwise gate by tab access.
-        child.key === 'requirements' ? true : (child.key ? hasTabAccess(currentUser, child.key) : true)
+        // 'founder_start' is not a tab permission: only the founder (or platform admin) sees it; /start re-checks on the server.
+        child.key === 'founder_start'
+          ? showFounderStart
+          : child.key === 'requirements' ? true : (child.key ? hasTabAccess(currentUser, child.key) : true)
       )
 
       // If no children left, return null (unless it's a group that should show empty? No, hide it)

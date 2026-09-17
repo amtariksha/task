@@ -33,4 +33,6 @@ export type RootStackParamList = {
     FeedTopics: undefined;
     DeletedItems: undefined;
     Reports: undefined;
+    FounderStart: undefined;
+    FounderRank: undefined;
 };

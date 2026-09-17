@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, Component, ErrorInfo, ReactNode, useRef } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { NavigationContainer, NavigationContainerRef, DefaultTheme as NavigationLightTheme, DarkTheme as NavigationDarkTheme } from '@react-navigation/native'
+import type { NavigationState } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { ApolloProvider, useQuery } from '@apollo/client/react'
 import { AuthContext } from './contexts/AuthContext'
@@ -40,6 +41,8 @@ import UsersScreen from './screens/UsersScreen'
 import FeedTopicsScreen from './screens/FeedTopicsScreen'
 import DeletedItemsScreen from './screens/DeletedItemsScreen'
 import ReportsScreen from './screens/ReportsScreen'
+import { FounderStartScreen } from './screens/founder/FounderStartScreen'
+import { FounderRankScreen } from './screens/founder/FounderRankScreen'
 import NotificationBell from './components/NotificationBell'
 import CustomDrawerContent from './components/CustomDrawerContent'
 import { OfflineBanner } from './components/OfflineBanner'
@@ -64,6 +67,27 @@ import { doc, onSnapshot } from 'firebase/firestore'
 import { firestore } from './config/firebase'
 import { setOnUnauthorized } from './utils/authEvents'
 import { API_BASE_URL } from './config/api'
+import { getCachedFounderFlag, refreshFounderFlag, clearFounderFlag } from './services/founderFlagService'
+import { istDateString } from './utils/founderFormat'
+import { FOUNDER_START } from './config/founder-queries'
+
+type RootNavigation = NavigationContainerRef<any> | null
+type RootState = NavigationState | undefined
+
+/**
+ * Losing the founder flag drops FounderStart from under any screen stacked on it, which would leave
+ * that screen as the root with no back button. Put Main back underneath (logged-in stack only).
+ */
+function restoreMainUnderneath(navigation: RootNavigation, rootState: RootState): void {
+  if (!navigation || !rootState?.routeNames.includes('Main')) return
+  const mainIndex = rootState.routes.findIndex((route) => route.name === 'Main')
+  if (mainIndex === 0) return
+  const mainRoute: NavigationState['routes'][number] = { key: `Main-restored-${Date.now()}`, name: 'Main' }
+  const routes = mainIndex > 0 ? rootState.routes.slice(mainIndex) : [mainRoute, ...rootState.routes]
+  // Existing route keys are kept, so the screen on top is not remounted.
+  navigation.reset({ ...rootState, index: routes.length - 1, routes })
+}
+
 
 // Disable dev tools warnings in production builds
 if (!__DEV__) {
@@ -573,6 +597,51 @@ function AppContent() {
   const [isPinSetupNeeded, setIsPinSetupNeeded] = useState(false)
   const [isAppLocked, setIsAppLocked] = useState(false)
 
+  // Founder flag decides whether FounderStart is registered (and is the root route).
+  // The AppState and notification handlers are registered once, so they read it via the ref.
+  const [isFounder, setIsFounder] = useState(false)
+  const isFounderRef = useRef(false)
+  isFounderRef.current = isFounder
+
+  const resetToFounderStart = useCallback(() => {
+    const navigation = navigationRef.current
+    if (!navigation?.isReady()) return
+    // FounderStart is registered only while the unlocked, logged-in stack is mounted.
+    if (!navigation.getRootState()?.routeNames?.includes('FounderStart')) return
+    navigation.reset({ index: 0, routes: [{ name: 'FounderStart' }] })
+  }, [])
+
+  const backgroundedAtRef = useRef(0)
+  const notificationNavAtRef = useRef(0)
+
+  // A key-less reset remounts Start even when it is already showing, which would throw away an open
+  // close-out (or unsaved rank edits), and it would replace a screen a notification tap just opened.
+  // In those cases today's Start is refetched in place instead.
+  const showStartForNewIstDay = useCallback(() => {
+    const navigation = navigationRef.current
+    const rootState = navigation?.isReady() ? navigation.getRootState() : undefined
+    const focusedRoute = rootState?.routes[rootState.index]?.name
+    const openedByNotification = notificationNavAtRef.current > backgroundedAtRef.current
+    if (focusedRoute === 'FounderStart' || focusedRoute === 'FounderRank' || openedByNotification) {
+      apolloClient.refetchQueries({ include: [FOUNDER_START] }).catch((error: unknown) => {
+        console.warn('Failed to refetch Start for the new day:', error)
+      })
+      return
+    }
+    resetToFounderStart()
+  }, [resetToFounderStart])
+
+  // Spec §6.1: the founder check runs on login and on every foreground, so a failed check right
+  // after login (or a server-side change) doesn't stick until the next cold start.
+  const refreshFounderFlagOnForeground = useCallback(async () => {
+    try {
+      const founder = await refreshFounderFlag()
+      if (await getUserToken()) setIsFounder(founder)
+    } catch (error) {
+      console.warn('Failed to refresh founder flag on foreground:', error)
+    }
+  }, [])
+
   // AppState listener for auto-locking when app resumes from background
   const wasBackgroundedRef = useRef(false)
   const appStateRef = useRef(AppState.currentState)
@@ -580,6 +649,7 @@ function AppContent() {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
       if (nextAppState === 'background') {
         wasBackgroundedRef.current = true
+        backgroundedAtRef.current = Date.now()
         await save('jsr_last_active_time', Date.now().toString())
       }
 
@@ -587,6 +657,9 @@ function AppContent() {
         wasBackgroundedRef.current &&
         nextAppState === 'active'
       ) {
+        // Read before the lock check below overwrites it.
+        const founderLastActive = isFounderRef.current ? await get('jsr_last_active_time') : null
+        let isLocking = false
         console.log('App resumed from background: checking lock...')
         const token = await getUserToken()
         if (token) {
@@ -596,12 +669,23 @@ function AppContent() {
             const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : 0
             const elapsed = Date.now() - lastActiveTime
             if (elapsed >= 5 * 60 * 1000) {
+              isLocking = true
               setIsAppLocked(true)
             } else {
               console.log(`Bypassing lock screen: returned after ${Math.round(elapsed / 1000)}s (< 300s).`)
               await save('jsr_last_active_time', Date.now().toString())
             }
           }
+        }
+        // A lock remounts the stack, which already lands a founder on Start.
+        if (token && !isLocking && isFounderRef.current && founderLastActive) {
+          const lastActiveMs = Number(founderLastActive)
+          if (lastActiveMs > 0 && istDateString(new Date(lastActiveMs)) !== istDateString(new Date())) {
+            showStartForNewIstDay()
+          }
+        }
+        if (token) {
+          void refreshFounderFlagOnForeground()
         }
         wasBackgroundedRef.current = false
       }
@@ -631,6 +715,16 @@ function AppContent() {
   const handleNotificationNavigation = (data: any) => {
     if (!navigationRef.current) {
       console.warn('Navigation ref not ready')
+      return
+    }
+    notificationNavAtRef.current = Date.now()
+
+    if (data?.screen === 'FounderStart') {
+      try {
+        navigationRef.current.navigate((isFounderRef.current ? 'FounderStart' : 'Notifications') as any)
+      } catch (error) {
+        console.error('Navigation error:', error)
+      }
       return
     }
 
@@ -711,6 +805,8 @@ function AppContent() {
             setIsPinSetupNeeded(true)
             setIsAppLocked(false)
           }
+          // Before RESTORE_TOKEN so the first logged-in render already has the right root route.
+          setIsFounder(await getCachedFounderFlag())
         }
       } catch (e) {
         console.error('Failed to restore token', e)
@@ -721,6 +817,43 @@ function AppContent() {
 
     bootstrapAsync()
   }, [])
+
+  // Re-check the founder flag with the server whenever the signed-in user changes.
+  useEffect(() => {
+    if (!state.userToken) {
+      setIsFounder(false)
+      return
+    }
+
+    let isCurrent = true
+    const syncFounderFlag = async () => {
+      try {
+        const founder = await refreshFounderFlag()
+        if (isCurrent) setIsFounder(founder)
+      } catch (error) {
+        console.warn('Failed to refresh founder flag:', error)
+      }
+    }
+    syncFounderFlag()
+
+    return () => {
+      isCurrent = false
+    }
+  }, [state.userToken])
+
+  // Runs after the render that registered FounderStart, so the reset can target it
+  // (first login as a founder while the logged-in stack is already showing Main).
+  useEffect(() => {
+    const navigation = navigationRef.current
+    const rootState = navigation?.isReady() ? navigation.getRootState() : undefined
+    if (!isFounder) {
+      restoreMainUnderneath(navigation, rootState)
+      return
+    }
+    // A stack mounted with the flag already set starts on FounderStart; resetting would remount it.
+    if (rootState?.routes[rootState.index]?.name === 'FounderStart') return
+    resetToFounderStart()
+  }, [isFounder, resetToFounderStart])
 
   // Initialize push notifications when user is authenticated
   useEffect(() => {
@@ -945,6 +1078,9 @@ function AppContent() {
           // Clear the saved project filter so the next user on this device
           // doesn't inherit the previous user's selected projects.
           await remove('selectedProjectIds')
+          // isFounder is cleared by the [state.userToken] effect after SIGN_OUT. Clearing it here, before
+          // the awaits below, would re-render the logged-in stack without FounderStart and mount Main mid-logout.
+          await clearFounderFlag()
 
           // Clear Apollo Client cache AND purge the persisted (AsyncStorage)
           // copy, otherwise the previous user's cached data survives to the
@@ -966,6 +1102,7 @@ function AppContent() {
         } catch (error) {
           console.error('Logout error:', error)
           // Still dispatch sign out even if cleanup fails
+          await clearFounderFlag()
           setIsPinSetupNeeded(false)
           setIsAppLocked(false)
           dispatch({ type: 'SIGN_OUT' })
@@ -1052,6 +1189,10 @@ function AppContent() {
                   </Stack.Screen>
                 ) : (
                   <>
+                    {/* First child is the initial route, so founders land on Start */}
+                    {isFounder && (
+                      <Stack.Screen name="FounderStart" component={FounderStartScreen} options={{ headerShown: false }} />
+                    )}
                     <Stack.Screen name="Main" options={{ headerShown: false }}>
                     {() => <BottomTabNavigator toggleDrawer={openDrawer} />}
                   </Stack.Screen>
@@ -1281,12 +1422,16 @@ function AppContent() {
                         headerTitle: 'Reports & Analytics',
                       }}
                     />
+                    {isFounder && (
+                      <Stack.Screen name="FounderRank" component={FounderRankScreen} options={{ title: 'Rank threads' }} />
+                    )}
                   </>
                 )}
               </Stack.Navigator>
               <CustomDrawerContent
                 visible={isDrawerOpen}
                 onClose={closeDrawer}
+                isFounder={isFounder}
               />
             </NavigationContainer>
           </TabBarProvider>

@@ -6,6 +6,12 @@ import { verifyToken } from '@/lib/auth-server'
 
 const isDevelopment = process.env.NODE_ENV === 'development'
 
+// Development request logging must never print credentials; `t` is the founder
+// ingest token (scripts/founder/founder-ingest.sh).
+const SECRET_VARIABLE_KEY = /^t$|^otp|token|secret|password/i
+const redactedVariablesJson = (variables: unknown): string =>
+  JSON.stringify(variables, (key, value) => (key && SECRET_VARIABLE_KEY.test(key) ? '<redacted>' : value), 2)
+
 // Create Apollo Server instance
 const server = new ApolloServer({
   typeDefs,
@@ -62,7 +68,7 @@ export async function POST(request: NextRequest) {
       console.log(`🚀 [GraphQL Server] Incoming ${body.query?.trim().startsWith('mutation') ? 'MUTATION' : 'QUERY'}: ${operationName}`)
       console.log(`⏱️  Timestamp: ${new Date().toISOString()}`)
       if (body.variables && Object.keys(body.variables).length > 0) {
-        console.log('🔧 Variables:', JSON.stringify(body.variables, null, 2))
+        console.log('🔧 Variables:', redactedVariablesJson(body.variables))
       }
       console.log('='.repeat(80) + '\n')
     }

@@ -18,6 +18,10 @@
     {
       "path": "/api/cron/reminders/6pm",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/founder-start",
+      "schedule": "30 3 * * *"
     }
   ]
 }

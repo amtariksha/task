@@ -24,6 +24,10 @@ export interface CreateNotificationParams {
   message?: string
   linkUrl?: string
   metadata?: Record<string, any>
+  /** Push/in-app only — e.g. the founder Start push, which must not also email. */
+  skipEmail?: boolean
+  /** Feed row only: the caller sends (and awaits) the push itself, e.g. the founder Start push. */
+  skipPush?: boolean
 }
 
 function mapNotificationTypeToPrefKey(type: string): string | null {
@@ -327,28 +331,34 @@ export async function createNotification(params: CreateNotificationParams): Prom
   }
 
   // Send push notification (don't await - fire and forget)
-  sendPushNotification(userId, {
-    title,
-    body: message || title,
-    data: {
-      notificationId,
-      type: mapNotificationTypeToPushType(notificationType),
-      postId,
-      commentId,
-      taskId,
-      bugId,
-      linkUrl
-    },
-    priority: getNotificationPriority(notificationType.startsWith('task_') ? 'task' : (notificationType.startsWith('bug_') ? 'bug' : notificationType))
-  }).catch(error => {
-    // Don't fail the notification creation if push notification fails
-    console.error('[createNotification] Failed to send push notification:', error)
-  })
+  if (!params.skipPush) {
+    sendPushNotification(userId, {
+      title,
+      body: message || title,
+      data: {
+        notificationId,
+        type: mapNotificationTypeToPushType(notificationType),
+        postId,
+        commentId,
+        taskId,
+        bugId,
+        linkUrl,
+        // Mobile routes on data.screen when metadata.screen is set.
+        screen: typeof metadata?.screen === 'string' ? metadata.screen : undefined
+      },
+      priority: getNotificationPriority(notificationType.startsWith('task_') ? 'task' : (notificationType.startsWith('bug_') ? 'bug' : notificationType))
+    }).catch(error => {
+      // Don't fail the notification creation if push notification fails
+      console.error('[createNotification] Failed to send push notification:', error)
+    })
+  }
 
   // Send email notification (don't await - fire and forget)
-  sendNotificationEmail(params, notificationType, title, message, linkUrl, metadata).catch(error => {
-    console.error('[createNotification] Failed to send email notification:', error)
-  })
+  if (!params.skipEmail) {
+    sendNotificationEmail(params, notificationType, title, message, linkUrl, metadata).catch(error => {
+      console.error('[createNotification] Failed to send email notification:', error)
+    })
+  }
 
   return result.rows[0]?.notification_id || ''
 }
