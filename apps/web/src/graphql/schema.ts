@@ -1,3 +1,5 @@
+import { founderTypeDefs } from './founder-schema'
+
 export const typeDefs = `#graphql
   type User {
     employeeId: ID!
@@ -17,6 +19,7 @@ export const typeDefs = `#graphql
     tasks: [Task!]!
     bugs: [Bug!]!
     tabPermissions: [String!]
+    isFounder: Boolean!
   }
 
   type Task {
@@ -854,5 +857,7 @@ export const typeDefs = `#graphql
     rollbackRequirementToVersion(requirementId: ID!, baselineId: ID!): Requirement!
     createDevItemFromRequirement(requirementId: ID!, input: CreateDevItemFromRequirementInput): Bug!
   }
+
+${founderTypeDefs}
 `
 

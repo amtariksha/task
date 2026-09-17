@@ -12,6 +12,8 @@ import { mentionQueries, mentionMutations, mentionFieldResolvers } from './menti
 import { notificationQueries, notificationMutations, FeedNotificationFieldResolvers, createNotificationLoader } from './notification-resolvers'
 import { pushTokenMutations } from './push-token-resolvers'
 import { requirementQueries, requirementMutations, requirementFieldResolvers } from './requirement-resolvers'
+import { founderQueries, founderMutations, founderFieldResolvers } from './founder-resolvers'
+import { isFounderEmployee } from '@/lib/founder/founder-auth'
 import { parseMentions, storeMentions } from '@/lib/mention-parser'
 import { createCommentNotification, createReactionNotification, createPostStatusNotification } from '@/lib/notification-helper'
 import { format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, addMinutes } from 'date-fns'
@@ -1269,7 +1271,10 @@ export const resolvers = {
     ...notificationQueries,
 
     // Requirement Queries
-    ...requirementQueries
+    ...requirementQueries,
+
+    // Founder Start Queries
+    ...founderQueries
   },
 
   // Field resolvers for User
@@ -1278,6 +1283,12 @@ export const resolvers = {
     // Also handle camelCase fields if the object was constructed manually (e.g. in homeDashboardData)
     // Provide fallback defaults for non-nullable fields to prevent null errors
     employeeId: (user: any) => user.employee_id || user.employeeId,
+    // Only ever true for the requesting user, so it never reveals who the founder is.
+    isFounder: async (user: any, _: any, context: any) => {
+      const employeeId = user.employee_id || user.employeeId
+      if (!employeeId || employeeId !== context?.user?.employeeId) return false
+      return isFounderEmployee(employeeId)
+    },
     name: (user: any) => user.name,
     email: (user: any) => user.email,
     phone: (user: any) => user.phone,
@@ -3154,6 +3165,9 @@ export const resolvers = {
     // Requirement Mutations
     ...requirementMutations,
 
+    // Founder Start Mutations
+    ...founderMutations,
+
     // Attendance Mutations
     signIn: async (_: any, __: any, context: any) => {
       const { user, req } = context
@@ -3561,6 +3575,9 @@ export const resolvers = {
   FeedNotification: FeedNotificationFieldResolvers,
 
   // Requirement Field Resolvers
-  ...requirementFieldResolvers
+  ...requirementFieldResolvers,
+
+  // Founder Start Field Resolvers
+  ...founderFieldResolvers
 }
 
