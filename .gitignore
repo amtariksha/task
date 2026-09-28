@@ -55,3 +55,6 @@ task-management-*.json
 # Local email previews
 scripts/test-email-previews/
 
+
+# graphify knowledge graph (regenerate with `graphify update .`)
+graphify-out/
