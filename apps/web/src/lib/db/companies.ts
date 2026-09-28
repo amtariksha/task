@@ -118,6 +118,20 @@ export async function isMemberOfCompany(employeeId: string, companyId: string): 
   return (await getCompanyRole(employeeId, companyId)) !== null
 }
 
+/**
+ * Every employee ID belonging to a company. Used to scope list endpoints in one
+ * query rather than asking `canViewUser` per row.
+ */
+export async function getCompanyMemberIds(companyId: string): Promise<string[]> {
+  return withRetry(async () => {
+    const rows = await query<Array<{ employee_id: string }>>(
+      'SELECT employee_id FROM user_companies WHERE company_id = $1',
+      [companyId]
+    )
+    return rows.map((row) => row.employee_id)
+  })
+}
+
 export async function addUserToCompany(
   employeeId: string,
   companyId: string,
