@@ -45,6 +45,12 @@ export async function GET(request: NextRequest) {
   // session's company decides which departments / roles / bug types come back.
   const sessionUser = await getAuthUser(request)
   const companyId = sessionUser?.companyId ?? null
+  // Every cache key below is suffixed with the company, and the responses are
+  // marked private: the in-process cache and the CDN were both keyed globally
+  // while the payload is company-specific, so the first tenant to warm the cache
+  // served its departments, roles and bug types to every other tenant.
+  const companySuffix = companyId ?? 'platform'
+  const PRIVATE_CACHE = 'private, max-age=60, must-revalidate'
   try {
     const searchParams = request.nextUrl.searchParams
     const key = searchParams.get('key')
@@ -55,25 +61,25 @@ export async function GET(request: NextRequest) {
 
     // Legacy grouped format (for backward compatibility)
     if (grouped) {
-      const cacheKey = 'settings_grouped'
+      const cacheKey = `settings_grouped_${companySuffix}`
       if (await cache.has(cacheKey)) {
         const res = NextResponse.json({ success: true, data: await cache.get<any>(cacheKey), source: 'cache' })
-        res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600')
+        res.headers.set('Cache-Control', PRIVATE_CACHE)
         return res
       }
-      const settingsByType = await getSettingsByType()
+      const settingsByType = await getSettingsByType(companyId)
       await cache.set(cacheKey, settingsByType, 1440) // 24 hours
       const res = NextResponse.json({ success: true, data: settingsByType, source: 'database' })
-      res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600')
+      res.headers.set('Cache-Control', PRIVATE_CACHE)
       return res
     }
 
     // Get dropdown settings only
     if (dropdowns) {
-      const cacheKey = 'settings_dropdowns'
+      const cacheKey = `settings_dropdowns_${companySuffix}`
       if (await cache.has(cacheKey)) {
         const res = NextResponse.json({ success: true, data: await cache.get<any>(cacheKey), source: 'cache' })
-        res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600')
+        res.headers.set('Cache-Control', PRIVATE_CACHE)
         return res
       }
       const dropdownSettings = await getDropdownSettings(companyId)
@@ -106,7 +112,7 @@ export async function GET(request: NextRequest) {
     // Get multiple settings by keys
     if (keys) {
       const keyArray = keys.split(',').map(k => k.trim())
-      const settings = await getSettingsByKeys(keyArray)
+      const settings = await getSettingsByKeys(keyArray, companyId)
       return NextResponse.json({
         success: true,
         data: settings
@@ -114,15 +120,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all settings
-    const cacheKeyAll = `settings_all_active_${activeOnly ? '1' : '0'}`
+    const cacheKeyAll = `settings_all_active_${activeOnly ? '1' : '0'}_${companySuffix}`
     if (await cache.has(cacheKeyAll)) {
       const cached = await cache.get<any[]>(cacheKeyAll) || []
       const res = NextResponse.json({ success: true, data: cached, count: cached.length, source: 'cache' })
-      res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600')
+      res.headers.set('Cache-Control', PRIVATE_CACHE)
       return res
     }
 
-    const settings = await getAllSettings(activeOnly)
+    const settings = await getAllSettings(activeOnly, companyId)
 
     await cache.set(cacheKeyAll, settings, 1440) // 24 hours
 
@@ -132,7 +138,7 @@ export async function GET(request: NextRequest) {
       count: settings.length,
       source: 'database'
     })
-    res.headers.set('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=3600')
+    res.headers.set('Cache-Control', PRIVATE_CACHE)
     return res
   } catch (error) {
     console.error('Settings API GET error:', error)

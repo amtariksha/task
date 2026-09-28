@@ -251,10 +251,17 @@ export async function getSettingValue<T = any>(key: string, defaultValue?: T, co
 /**
  * Get all settings, optionally filtered by active status
  */
-export async function getAllSettings(activeOnly: boolean = true): Promise<Setting[]> {
+export async function getAllSettings(
+  activeOnly: boolean = true,
+  companyId?: string | null
+): Promise<Setting[]> {
   try {
+    // DISTINCT ON collapses each key to one row, preferring the company's own
+    // override over the platform default — the same rule getDropdownSettings
+    // uses. Without the company filter this returned every company's rows, so a
+    // tenant saw other tenants' departments and roles.
     let sql = `
-      SELECT
+      SELECT DISTINCT ON (key)
         id,
         key,
         value,
@@ -265,15 +272,15 @@ export async function getAllSettings(activeOnly: boolean = true): Promise<Settin
         created_at as created_at,
         updated_at as updatedAt
       FROM settings
-      WHERE 1=1
+      WHERE (company_id IS NULL OR company_id = $1)
     `
-    const params: any[] = []
+    const params: any[] = [companyId ?? null]
 
     if (activeOnly) {
       sql += ' AND is_active = TRUE'
     }
 
-    sql += ' ORDER BY key'
+    sql += ' ORDER BY key, (company_id IS NULL)'
 
     const results = await query<any[]>(sql, params)
 
@@ -325,22 +332,29 @@ export async function getAllSettings(activeOnly: boolean = true): Promise<Settin
 /**
  * Get multiple settings by keys
  */
-export async function getSettingsByKeys(keys: string[]): Promise<Record<string, any>> {
+export async function getSettingsByKeys(
+  keys: string[],
+  companyId?: string | null
+): Promise<Record<string, any>> {
   try {
     if (keys.length === 0) {
       return {}
     }
 
     const placeholders = keys.map((_, i) => `$${i + 1}`).join(',')
+    // Company override wins over the platform default, as in getSettingByKey.
     const sql = `
-      SELECT
+      SELECT DISTINCT ON (key)
         key,
         value
       FROM settings
-      WHERE key IN (${placeholders}) AND is_active = TRUE
+      WHERE key IN (${placeholders})
+        AND is_active = TRUE
+        AND (company_id IS NULL OR company_id = $${keys.length + 1})
+      ORDER BY key, (company_id IS NULL)
     `
 
-    const results = await query<any[]>(sql, keys)
+    const results = await query<any[]>(sql, [...keys, companyId ?? null])
 
     const settings: Record<string, any> = {}
     results.forEach(row => {
@@ -580,9 +594,11 @@ export async function permanentlyDeleteSetting(id: number): Promise<boolean> {
  * Maps new structure to old structure
  * @deprecated Use getDropdownSettings() instead
  */
-export async function getSettingsByType(): Promise<Record<SettingType, string[]>> {
+export async function getSettingsByType(
+  companyId?: string | null
+): Promise<Record<SettingType, string[]>> {
   try {
-    const dropdowns = await getDropdownSettings()
+    const dropdowns = await getDropdownSettings(companyId)
 
     // Map new keys to old SettingType keys
     const keyMapping: Record<string, SettingType> = {

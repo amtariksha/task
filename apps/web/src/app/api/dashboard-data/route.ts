@@ -57,7 +57,11 @@ export async function GET(request: NextRequest) {
       bugSubtasksPromise = withTimeout(getBugSubTasksByAssignedTo(employeeId), 10000, 'Failed to fetch bug subtasks for user')
     }
 
-    const settingsPromise = withTimeout(getDropdownSettings(), 8000, 'Failed to fetch settings')
+    const settingsPromise = withTimeout(
+      getDropdownSettings(authUser.companyId ?? null),
+      8000,
+      'Failed to fetch settings'
+    )
 
     let [tasks, bugs, settings, users, subtasks, bugSubtasks] = await Promise.all([
       tasksPromise!,
@@ -143,7 +147,9 @@ export async function GET(request: NextRequest) {
     }
 
     const res = NextResponse.json(payload)
-    res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    // The payload is this employee's own tasks and bugs; a shared cache would
+    // serve it to whoever asked next.
+    res.headers.set('Cache-Control', 'private, max-age=60')
     return res
   } catch (error: any) {
     console.error('Error in GET /api/dashboard-data:', error)
