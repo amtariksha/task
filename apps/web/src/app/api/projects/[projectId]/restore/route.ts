@@ -28,22 +28,20 @@ export async function POST(
     // Restoring a soft-deleted project had no permission check at all.
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
-    if (!(await canManageProject(auth.user, projectId))) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have permission to restore this project.' },
-        { status: 403 }
-      )
-    }
 
-    // TODO: Add permission check here (admin only)
-    // For now, we'll trust the frontend to only allow admin
-
-    // Check if project exists (including deleted)
+    // Existence (including deleted rows) before permission, so a bad id is a 404.
     const existingProject = await getProjectById(projectId, true)
     if (!existingProject) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
+      )
+    }
+
+    if (!(await canManageProject(auth.user, projectId))) {
+      return NextResponse.json(
+        { success: false, error: 'You do not have permission to restore this project.' },
+        { status: 403 }
       )
     }
 
@@ -69,7 +67,8 @@ export async function POST(
     const restoredProject = await getProjectById(projectId)
 
     return NextResponse.json(
-      { 
+      {
+        success: true,
         message: 'Project restored successfully',
         project: restoredProject
       },

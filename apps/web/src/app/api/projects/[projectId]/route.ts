@@ -74,10 +74,12 @@ export async function GET(
  *   parentProjectId?: string
  *   description?: string
  *   status?: 'Active' | 'Inactive'
- *   updatedBy: string (required, employee ID)
  * }
- * 
- * Permissions: Only admin and top_management can update projects
+ *
+ * The actor is taken from the session; an `updatedBy` in the body is ignored.
+ *
+ * Permissions: canManageProject — a company admin of the project's company, or
+ * the project's own manager.
  */
 export async function PUT(
   request: NextRequest,
@@ -85,9 +87,8 @@ export async function PUT(
 ) {
   try {
     const { projectId } = await params
-    const body = await request.json()
-
-    // Validate updatedBy field
+    // Tolerate an absent or malformed body: every field is optional.
+    const body = await request.json().catch(() => ({} as Record<string, unknown>))
 
     // This route carried a "TODO: Add permission check / trust the frontend"
     // comment, so any caller could edit any project, and the actor came from
@@ -95,29 +96,21 @@ export async function PUT(
     // verified session, and canManageProject applies the tenant boundary.
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
-    if (!(await canManageProject(auth.user, projectId))) {
-      return NextResponse.json(
-        { error: 'You do not have permission to edit this project.' },
-        { status: 403 }
-      )
-    }
 
-    if (!body.updatedBy) {
-      return NextResponse.json(
-        { error: 'Missing required field: updatedBy' },
-        { status: 400 }
-      )
-    }
-
-    // TODO: Add permission check here
-    // For now, we'll trust the frontend to only allow admin/top_management
-
-    // Check if project exists
+    // Existence first, so a missing project is a 404 rather than a 403 that
+    // leaks nothing but reads like a permissions problem.
     const existingProject = await getProjectById(projectId)
     if (!existingProject) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
+      )
+    }
+
+    if (!(await canManageProject(auth.user, projectId))) {
+      return NextResponse.json(
+        { error: 'You do not have permission to edit this project.' },
+        { status: 403 }
       )
     }
 
@@ -133,7 +126,10 @@ export async function PUT(
     // Update project (validation happens in the database layer)
     const updatedProject = await updateProject(projectId, updates, auth.user.employeeId)
 
-    return NextResponse.json(updatedProject, { status: 200 })
+    // The project is spread at the top level for the existing web callers, with
+    // `success` added because the mobile client reads that flag and treated the
+    // absent field as a failure.
+    return NextResponse.json({ ...updatedProject, success: true }, { status: 200 })
   } catch (error) {
     console.error('Error updating project:', error)
     
@@ -157,12 +153,11 @@ export async function PUT(
  * 
  * Soft delete a project (mark as deleted, not physical delete)
  * 
- * Request body:
- * {
- *   deletedBy: string (required, employee ID)
- * }
- * 
- * Permissions: Only admin can delete projects
+ * Request body: none. The actor is taken from the session; a `deletedBy` in the
+ * body is ignored.
+ *
+ * Permissions: canManageProject — a company admin of the project's company, or
+ * the project's own manager.
  * 
  * Note: Cannot delete projects with sub-projects
  */
@@ -180,39 +175,28 @@ export async function DELETE(
 ) {
   try {
     const { projectId } = await params
-    const body = await request.json()
 
-    // Validate deletedBy field
-
+    // DELETE carries no body from either client, so parsing it unconditionally
+    // threw and every delete came back 400 "Unexpected end of JSON input".
     // This route carried a "TODO: Add permission check / trust the frontend"
     // comment, so any caller could delete any project, and the actor came from
     // the request body and was therefore spoofable. Both now come from the
     // verified session, and canManageProject applies the tenant boundary.
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
-    if (!(await canManageProject(auth.user, projectId))) {
-      return NextResponse.json(
-        { error: 'You do not have permission to delete this project.' },
-        { status: 403 }
-      )
-    }
 
-    if (!body.deletedBy) {
-      return NextResponse.json(
-        { error: 'Missing required field: deletedBy' },
-        { status: 400 }
-      )
-    }
-
-    // TODO: Add permission check here (admin only)
-    // For now, we'll trust the frontend to only allow admin
-
-    // Check if project exists
     const existingProject = await getProjectById(projectId)
     if (!existingProject) {
       return NextResponse.json(
         { error: 'Project not found' },
         { status: 404 }
+      )
+    }
+
+    if (!(await canManageProject(auth.user, projectId))) {
+      return NextResponse.json(
+        { error: 'You do not have permission to delete this project.' },
+        { status: 403 }
       )
     }
 
@@ -227,7 +211,7 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { message: 'Project deleted successfully' },
+      { success: true, message: 'Project deleted successfully' },
       { status: 200 }
     )
   } catch (error) {
