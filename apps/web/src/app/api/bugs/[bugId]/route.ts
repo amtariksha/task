@@ -6,6 +6,7 @@ import { logEntityChanges, createActivityLog } from '@/lib/db/activityLog'
 import { verifyToken, getAuthUser } from '@/lib/auth-server'
 import { getUserProjectIds } from '@/lib/db/project-users'
 import { createNotification } from '@/lib/notification-helper'
+import { workItemNoun, type WorkItemType } from '@/lib/workItemType'
 import { canEditWorkItem, isSameCompany } from '@/lib/authz'
 
 /**
@@ -175,11 +176,14 @@ export async function PUT(
       try {
         const actor = await getUserByEmployeeId(userId)
         const actorName = actor?.name || userId || 'Someone'
+        // Features, bugs and releases share the bugs table; these titles said
+        // "Bug" for all three while the emails already used the real noun.
+        const noun = workItemNoun(bug.type as WorkItemType)
 
         // 1. Assignment Change
         if (isAssignmentChange && bug.assignedTo) {
-          const title = 'New Bug Assigned'
-          const message = `${actorName} assigned you bug: ${bug.title}`
+          const title = `New ${noun} Assigned`
+          const message = `${actorName} assigned you ${noun.toLowerCase()}: ${bug.title}`
           await createNotification({
             userId: bug.assignedTo as string,
             actorId: userId,
@@ -193,8 +197,8 @@ export async function PUT(
 
         // 2. Status Change (Notify assignee and reporter)
         if (isStatusChange) {
-          const title = 'Bug Status Changed'
-          const message = `${actorName} updated bug ${bug.bugId} status to: ${bug.status}`
+          const title = `${noun} Status Changed`
+          const message = `${actorName} updated ${bug.bugId} status to: ${bug.status}`
           const recipients = new Set<string>()
           if (bug.assignedTo) recipients.add(bug.assignedTo)
           if (bug.reportedBy) recipients.add(bug.reportedBy)
@@ -217,8 +221,8 @@ export async function PUT(
 
         // 3. Severity Change (Notify assignee and reporter)
         if (isSeverityChange) {
-          const title = 'Bug Severity Changed'
-          const message = `${actorName} updated bug ${bug.bugId} severity to: ${bug.severity}`
+          const title = `${noun} Severity Changed`
+          const message = `${actorName} updated ${bug.bugId} severity to: ${bug.severity}`
           const recipients = new Set<string>()
           if (bug.assignedTo) recipients.add(bug.assignedTo)
           if (bug.reportedBy) recipients.add(bug.reportedBy)
