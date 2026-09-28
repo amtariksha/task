@@ -55,6 +55,14 @@ export async function GET(request: NextRequest) {
       sql += ` AND owner_user_id IS NULL AND is_personal = false`
     }
 
+    // Topics have belonged to a company since migration 062, but this query
+    // ignored the column, so every tenant saw every other tenant's topic names.
+    // Rows with a NULL company are pre-062 leftovers and stay visible to all.
+    if (user.companyId && !user.isPlatformAdmin) {
+      params.push(user.companyId)
+      sql += ` AND (company_id IS NULL OR company_id = $${params.length})`
+    }
+
     sql += ` ORDER BY display_order ASC, created_at ASC`
 
     const topics = await query(sql, params)
@@ -132,12 +140,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Insert new topic
+    // Stamp the creator's company, or the topic would be invisible to the
+    // company filter above for everyone including its author.
     const result = await query(
-      `INSERT INTO feed_topics (topic_name, description, icon, display_order, created_by)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO feed_topics (topic_name, description, icon, display_order, created_by, company_id)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [topicName, description || null, icon || null, displayOrder || 0, user.employeeId]
+      [topicName, description || null, icon || null, displayOrder || 0, user.employeeId, user.companyId ?? null]
     )
 
     return NextResponse.json({

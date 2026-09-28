@@ -29,6 +29,13 @@ import { Project } from '@/lib/types'
  */
 export async function GET(request: NextRequest) {
   try {
+    // Authenticate before querying, so an unauthenticated request does not cost a
+    // full project scan before being turned away.
+    const authUser = await getAuthUser(request)
+    if (!authUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const searchParams = request.nextUrl.searchParams
     const status = searchParams.get('status') || 'active'
     const type = searchParams.get('type') || 'all'
@@ -52,10 +59,6 @@ export async function GET(request: NextRequest) {
     // for EVERY role (admin/top_management included). The admin project
     // management surfaces use /api/projects/hierarchy, which is intentionally
     // left role-based so admins can still manage all projects.
-    const authUser = await getAuthUser(request)
-    if (!authUser) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
     const userProjectIds = await getUserProjectIds(authUser.employeeId)
     // Include projects the user is assigned to, plus their sub-projects
     const assignedSet = new Set(userProjectIds)
@@ -63,6 +66,15 @@ export async function GET(request: NextRequest) {
       assignedSet.has(p.projectId) ||
       (p.parentProjectId && assignedSet.has(p.parentProjectId))
     )
+
+    // Assignment alone is not enough for a user who belongs to more than one
+    // company: their projects in the other company were showing up in the
+    // dropdowns and the mobile project filter regardless of which company the
+    // session is acting in. Platform admins and pre-062 tokens keep the wide view.
+    const sessionCompanyId = authUser.companyId
+    if (sessionCompanyId && !authUser.isPlatformAdmin) {
+      projects = projects.filter(p => !p.companyId || p.companyId === sessionCompanyId)
+    }
 
     return NextResponse.json(projects, { status: 200 })
   } catch (error) {

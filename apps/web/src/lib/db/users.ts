@@ -273,6 +273,16 @@ export async function getNextEmployeeId(prefix: string = EMPLOYEE_ID_PREFIX): Pr
   return `${prefix}-${String(next).padStart(4, '0')}`
 }
 
+/**
+ * The prefix of an existing employee ID ('AM-0007' -> 'AM'). Employee IDs are
+ * prefixed per company (companies.code), so a collision retry has to renumber
+ * within the same company rather than falling back to the default prefix.
+ */
+function employeeIdPrefix(employeeId: string): string {
+  const match = /^(.+)-\d+$/.exec(employeeId)
+  return match ? match[1] : EMPLOYEE_ID_PREFIX
+}
+
 const UNIQUE_VIOLATION = '23505'
 
 // Create a new user
@@ -328,7 +338,10 @@ export async function createUser(user: Omit<User, 'createdAt' | 'updatedAt'>): P
       // Only an employee_id collision is retryable. A duplicate email is a real
       // input error and must surface to the admin unchanged.
       if (code === UNIQUE_VIOLATION && detail.includes('employee_id')) {
-        employeeId = await getNextEmployeeId()
+        // Renumber within the SAME company: retrying with the default prefix
+        // moved the new user into the 'AM' run no matter which company they
+        // belonged to.
+        employeeId = await getNextEmployeeId(employeeIdPrefix(employeeId))
         continue
       }
       throw error
