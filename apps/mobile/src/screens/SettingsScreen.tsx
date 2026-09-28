@@ -31,7 +31,7 @@ import Constants from 'expo-constants'
 import { AuthContext } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { materialColors, materialTypography, materialSpacing } from '../config/materialTheme'
-import { getUserData, saveUserData as setUserData, getSecure, saveSecure, SECURE_KEYS } from '../utils/secureStorage'
+import { getUserData, saveUserData as setUserData, getSecure, saveSecure, SECURE_KEYS, getCurrentUserPin, saveUserPin } from '../utils/secureStorage'
 import apiClient from '../services/apiClient'
 import { getAllSettings, GroupedSettings } from '../services/settingsService'
 import {
@@ -405,7 +405,7 @@ export default function SettingsScreen() {
   const handleProcessChangePin = async () => {
     setChangePinError('')
     if (changePinStep === 'verify') {
-      const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+      const storedPin = await getCurrentUserPin()
       if (storedPin === currentPinInput) {
         setChangePinStep('new')
       } else {
@@ -420,7 +420,13 @@ export default function SettingsScreen() {
       setChangePinStep('confirm')
     } else if (changePinStep === 'confirm') {
       if (newPinInput === confirmPinInput) {
-        await saveSecure(SECURE_KEYS.USER_PIN, newPinInput)
+        const employeeId = (await getUserData<{ employeeId?: string }>())?.employeeId
+        if (!employeeId) {
+          setChangePinError('Could not identify the signed-in user')
+          return
+        }
+        // Per-user key: a device-wide PIN locked the next person to sign in.
+        await saveUserPin(employeeId, newPinInput)
         Alert.alert('Success', 'Security PIN changed successfully')
         setChangePinVisible(false)
       } else {

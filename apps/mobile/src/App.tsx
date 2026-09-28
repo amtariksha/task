@@ -49,7 +49,7 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { ActivityIndicator, View, LogBox, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native'
 import { IconButton, Provider as PaperProvider } from 'react-native-paper'
 import { apolloClient, initializeApollo, persistor } from './config/apollo'
-import { getUserToken, saveUserToken, saveUserData, clearSecureData, getUserData, getSecure, SECURE_KEYS, save, get, remove } from './utils/secureStorage'
+import { getUserToken, saveUserToken, saveUserData, clearSecureData, getUserData, getSecure, getCurrentUserPin, discardLegacyDevicePin, SECURE_KEYS, save, get, remove } from './utils/secureStorage'
 import { LOGIN_MUTATION, REGISTER_PUSH_TOKEN, UNREGISTER_PUSH_TOKEN, GET_FEED_POSTS, GET_FEED_TOPICS } from './config/graphql-queries'
 import { ThemeProvider, useTheme, lightColors, darkColors, DrawerProvider, useDrawer } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -671,7 +671,7 @@ function AppContent() {
         console.log('App resumed from background: checking lock...')
         const token = await getUserToken()
         if (token) {
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             const lastActiveStr = await get('jsr_last_active_time')
             const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : 0
@@ -793,11 +793,15 @@ function AppContent() {
         // Initialize Apollo cache persistence
         await initializeApollo()
 
+        // One-off cleanup: a PIN stored under the old device-wide key would lock
+        // whoever signs in next, whoever set it.
+        await discardLegacyDevicePin()
+
         // Use SecureStore instead of AsyncStorage for token
         userToken = await getUserToken()
 
         if (userToken) {
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             const lastActiveStr = await get('jsr_last_active_time')
             const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : 0
@@ -952,7 +956,7 @@ function AppContent() {
             await saveUserData(user)
 
             // Check if PIN setup is required
-            const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+            const storedPin = await getCurrentUserPin()
             if (storedPin) {
               setIsAppLocked(true) // Lock the app so they have to enter the PIN
               setIsPinSetupNeeded(false)
@@ -1008,7 +1012,7 @@ function AppContent() {
           await saveUserToken(token)
           await saveUserData(user)
 
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             setIsAppLocked(true)
             setIsPinSetupNeeded(false)
@@ -1034,7 +1038,7 @@ function AppContent() {
             return { success: false, error: 'No stored session' }
           }
 
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             setIsAppLocked(true)
             setIsPinSetupNeeded(false)

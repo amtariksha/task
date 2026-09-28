@@ -1,4 +1,4 @@
-import { User } from '../services/userService'
+import type { User } from '../services/userService'
 
 // Define all available tabs in the application
 // Order here determines order in the User Edit modal's permission grid
