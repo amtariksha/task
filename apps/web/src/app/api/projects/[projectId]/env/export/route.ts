@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertProjectSecretAccess } from '@/lib/auth-server'
+import { assertProjectSecretAccess } from '@/lib/projectSecrets/guard'
 import { listEnvSecrets, logCredentialAccess, type SecretEnvironment } from '@/lib/db/credentials'
 import { serializeDotenv } from '@/lib/dotenvParse'
 
@@ -15,7 +15,9 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  // 'export' pulls every value for an environment at once, so it takes the same
+  // authority as changing them.
+  const auth = await assertProjectSecretAccess(request, projectId, 'export')
   if (!auth.ok) return auth.response
 
   const environment = parseEnvironment(request.nextUrl.searchParams.get('environment'))

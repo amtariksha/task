@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertProjectSecretAccess } from '@/lib/auth-server'
+import { assertProjectSecretAccess, canProjectSecretAction, NO_STORE_HEADERS } from '@/lib/projectSecrets/guard'
 import {
   listEnvSecrets,
   upsertEnvSecret,
@@ -20,16 +20,20 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
-  if (!auth.ok) return auth.response
-
   const environment = parseEnvironment(request.nextUrl.searchParams.get('environment'))
   const reveal = request.nextUrl.searchParams.get('reveal') === 'true'
+
+  const auth = await assertProjectSecretAccess(request, projectId, reveal ? 'reveal' : 'view')
+  if (!auth.ok) return auth.response
 
   try {
     const secrets = await listEnvSecrets(projectId, environment, reveal)
     await logCredentialAccess(projectId, auth.user.employeeId, reveal ? 'reveal' : 'view')
-    return NextResponse.json({ success: true, data: secrets })
+    const canWrite = await canProjectSecretAction(auth.user, projectId, 'write')
+    return NextResponse.json(
+      { success: true, data: secrets, canWrite },
+      reveal ? { headers: NO_STORE_HEADERS } : undefined
+    )
   } catch (error) {
     console.error('Failed to list env secrets:', error)
     return NextResponse.json({ success: false, error: 'Failed to list env secrets' }, { status: 500 })
@@ -42,7 +46,7 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   try {
@@ -70,7 +74,7 @@ export async function DELETE(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   const environment = parseEnvironment(request.nextUrl.searchParams.get('environment'))

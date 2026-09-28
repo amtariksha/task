@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertProjectSecretAccess } from '@/lib/auth-server'
+import { assertProjectSecretAccess, NO_STORE_HEADERS } from '@/lib/projectSecrets/guard'
 import {
   getCredentialValue,
   updateCredential,
@@ -16,7 +16,7 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
   const { projectId, id } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'reveal')
   if (!auth.ok) return auth.response
 
   const credId = Number(id)
@@ -30,7 +30,8 @@ export async function GET(
       return NextResponse.json({ success: false, error: 'Not found' }, { status: 404 })
     }
     await logCredentialAccess(projectId, auth.user.employeeId, 'reveal', credId)
-    return NextResponse.json({ success: true, data: credential })
+    // A decrypted secret must never sit in a shared cache or a proxy.
+    return NextResponse.json({ success: true, data: credential }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     console.error('Failed to reveal credential:', error)
     return NextResponse.json({ success: false, error: 'Failed to reveal credential' }, { status: 500 })
@@ -43,7 +44,7 @@ export async function PUT(
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
   const { projectId, id } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   const credId = Number(id)
@@ -77,7 +78,7 @@ export async function DELETE(
   { params }: { params: Promise<{ projectId: string; id: string }> }
 ) {
   const { projectId, id } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   const credId = Number(id)

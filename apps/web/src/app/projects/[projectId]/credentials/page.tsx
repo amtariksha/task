@@ -46,6 +46,9 @@ export default function ProjectCredentialsPage() {
   const [tab, setTab] = useState<'credentials' | 'env'>('credentials')
   const [forbidden, setForbidden] = useState(false)
   const [error, setError] = useState('')
+  // Reading a project's secrets no longer implies being allowed to change them:
+  // only a project manager, team leader or company admin may write.
+  const [canWrite, setCanWrite] = useState(false)
 
   // Credentials state
   const [credentials, setCredentials] = useState<CredentialSummary[]>([])
@@ -64,14 +67,19 @@ export default function ProjectCredentialsPage() {
     const { ok, status, json } = await api(`/api/projects/${projectId}/credentials`)
     if (status === 401) { router.push('/'); return }
     if (status === 403) { setForbidden(true); return }
-    if (ok) setCredentials(json.data || [])
-    else setError(json.error || 'Failed to load credentials')
+    if (ok) {
+      setCredentials(json.data || [])
+      setCanWrite(Boolean(json.canWrite))
+    } else setError(json.error || 'Failed to load credentials')
   }, [projectId, router])
 
   const loadEnv = useCallback(async () => {
     const { ok, status, json } = await api(`/api/projects/${projectId}/env?environment=${environment}&reveal=${showEnvValues}`)
     if (status === 403) { setForbidden(true); return }
-    if (ok) setEnvSecrets(json.data || [])
+    if (ok) {
+      setEnvSecrets(json.data || [])
+      setCanWrite(Boolean(json.canWrite))
+    }
   }, [projectId, environment, showEnvValues])
 
   useEffect(() => { loadCredentials() }, [loadCredentials])
@@ -84,12 +92,14 @@ export default function ProjectCredentialsPage() {
     }
     const { ok, json } = await api(`/api/projects/${projectId}/credentials/${id}`)
     if (ok) setRevealed((r) => ({ ...r, [id]: json.data.value }))
+    else setError(json.error || 'Failed to reveal credential')
   }
 
   const addCredential = async () => {
     if (!newCred.name.trim() || !newCred.value.trim()) return
     setSavingCred(true)
-    const { ok } = await api(`/api/projects/${projectId}/credentials`, {
+    setError('')
+    const { ok, json } = await api(`/api/projects/${projectId}/credentials`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,28 +113,32 @@ export default function ProjectCredentialsPage() {
     if (ok) {
       setNewCred({ name: '', type: 'other', value: '', note: '' })
       loadCredentials()
-    }
+    } else setError(json.error || 'Failed to add credential')
   }
 
   const deleteCredential = async (id: number) => {
     if (!confirm('Delete this credential?')) return
-    const { ok } = await api(`/api/projects/${projectId}/credentials/${id}`, { method: 'DELETE' })
+    const { ok, json } = await api(`/api/projects/${projectId}/credentials/${id}`, { method: 'DELETE' })
     if (ok) loadCredentials()
+    else setError(json.error || 'Failed to delete credential')
   }
 
   const addEnv = async () => {
     if (!newEnv.key.trim()) return
-    const { ok } = await api(`/api/projects/${projectId}/env`, {
+    setError('')
+    const { ok, json } = await api(`/api/projects/${projectId}/env`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ environment, key: newEnv.key.trim(), value: newEnv.value }),
     })
     if (ok) { setNewEnv({ key: '', value: '' }); loadEnv() }
+    else setError(json.error || 'Failed to add variable')
   }
 
   const deleteEnv = async (key: string) => {
-    const { ok } = await api(`/api/projects/${projectId}/env?environment=${environment}&key=${encodeURIComponent(key)}`, { method: 'DELETE' })
+    const { ok, json } = await api(`/api/projects/${projectId}/env?environment=${environment}&key=${encodeURIComponent(key)}`, { method: 'DELETE' })
     if (ok) loadEnv()
+    else setError(json.error || 'Failed to delete variable')
   }
 
   const uploadEnvFile = async () => {
@@ -182,7 +196,8 @@ export default function ProjectCredentialsPage() {
 
       {tab === 'credentials' && (
         <div className="space-y-6">
-          {/* Add credential */}
+          {/* Add credential — writers only */}
+          {canWrite && (
           <div className="rounded-lg border border-gray-200 p-4 bg-gray-50">
             <h2 className="text-sm font-semibold text-gray-700 mb-3">Add credential</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -195,6 +210,7 @@ export default function ProjectCredentialsPage() {
             </div>
             <button onClick={addCredential} disabled={savingCred} className="mt-3 px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 disabled:opacity-60">{savingCred ? 'Saving…' : 'Add credential'}</button>
           </div>
+          )}
 
           {/* List */}
           <div className="space-y-2">
@@ -209,7 +225,7 @@ export default function ProjectCredentialsPage() {
                   </div>
                   <div className="flex gap-3 text-sm">
                     <button onClick={() => revealCredential(c.id)} className="text-indigo-600 hover:underline">{revealed[c.id] !== undefined ? 'Hide' : 'Reveal'}</button>
-                    <button onClick={() => deleteCredential(c.id)} className="text-rose-600 hover:underline">Delete</button>
+                    {canWrite && <button onClick={() => deleteCredential(c.id)} className="text-rose-600 hover:underline">Delete</button>}
                   </div>
                 </div>
                 {revealed[c.id] !== undefined && (
@@ -229,23 +245,27 @@ export default function ProjectCredentialsPage() {
               {ENVIRONMENTS.map((e) => <option key={e} value={e}>{e}</option>)}
             </select>
             <button onClick={() => setShowEnvValues((v) => !v)} className="ml-auto text-sm text-indigo-600 hover:underline">{showEnvValues ? 'Hide values' : 'Show values'}</button>
-            <a href={`/api/projects/${projectId}/env/export?environment=${environment}`} className="text-sm text-indigo-600 hover:underline">Export .env</a>
+            {canWrite && <a href={`/api/projects/${projectId}/env/export?environment=${environment}`} className="text-sm text-indigo-600 hover:underline">Export .env</a>}
           </div>
 
-          {/* Upload .env */}
+          {/* Upload .env — writers only */}
+          {canWrite && (
           <div className="rounded-lg border border-gray-200 p-4 bg-gray-50">
             <h2 className="text-sm font-semibold text-gray-700 mb-2">Upload .env</h2>
             <input type="file" accept=".env,text/plain" onChange={onFilePicked} className="text-sm mb-2 block" />
             <textarea className="border rounded px-3 py-2 text-sm w-full font-mono" rows={4} placeholder={'KEY=value\nANOTHER_KEY=value'} value={envFileText} onChange={(e) => setEnvFileText(e.target.value)} />
             <button onClick={uploadEnvFile} className="mt-2 px-4 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Import to {environment}</button>
           </div>
+          )}
 
-          {/* Add single key */}
+          {/* Add single key — writers only */}
+          {canWrite && (
           <div className="flex flex-col sm:flex-row gap-2">
             <input className="border rounded px-3 py-2 text-sm flex-1 font-mono" placeholder="KEY" value={newEnv.key} onChange={(e) => setNewEnv({ ...newEnv, key: e.target.value })} />
             <input className="border rounded px-3 py-2 text-sm flex-1 font-mono" placeholder="value" value={newEnv.value} onChange={(e) => setNewEnv({ ...newEnv, value: e.target.value })} />
             <button onClick={addEnv} className="px-4 py-2 bg-gray-800 text-white text-sm rounded hover:bg-gray-900">Add</button>
           </div>
+          )}
 
           {/* List */}
           <div className="rounded-lg border border-gray-200 divide-y">
@@ -262,7 +282,7 @@ export default function ProjectCredentialsPage() {
                   ) : (
                     <span className="font-mono text-gray-400">••••••••</span>
                   )}
-                  <button onClick={() => deleteEnv(s.key)} className="text-rose-600 hover:underline shrink-0">Delete</button>
+                  {canWrite && <button onClick={() => deleteEnv(s.key)} className="text-rose-600 hover:underline shrink-0">Delete</button>}
                 </div>
               </div>
             ))}

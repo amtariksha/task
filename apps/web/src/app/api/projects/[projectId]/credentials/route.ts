@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertProjectSecretAccess } from '@/lib/auth-server'
+import { assertProjectSecretAccess, canProjectSecretAction } from '@/lib/projectSecrets/guard'
 import {
   listCredentials,
   createCredential,
@@ -15,13 +15,16 @@ export async function GET(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'view')
   if (!auth.ok) return auth.response
 
   try {
     const credentials = await listCredentials(projectId)
     await logCredentialAccess(projectId, auth.user.employeeId, 'view')
-    return NextResponse.json({ success: true, data: credentials })
+    // Reading and writing are separate rights now, so tell the client which it
+    // has instead of letting it discover the difference through a 403.
+    const canWrite = await canProjectSecretAction(auth.user, projectId, 'write')
+    return NextResponse.json({ success: true, data: credentials, canWrite })
   } catch (error) {
     console.error('Failed to list credentials:', error)
     return NextResponse.json({ success: false, error: 'Failed to list credentials' }, { status: 500 })
@@ -34,7 +37,7 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   try {

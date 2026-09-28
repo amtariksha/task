@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { assertProjectSecretAccess } from '@/lib/auth-server'
+import { assertProjectSecretAccess } from '@/lib/projectSecrets/guard'
 import { bulkUpsertEnvSecrets, logCredentialAccess, type SecretEnvironment } from '@/lib/db/credentials'
 import { parseDotenv } from '@/lib/dotenvParse'
 
@@ -18,7 +18,7 @@ export async function POST(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   const { projectId } = await params
-  const auth = await assertProjectSecretAccess(request, projectId)
+  const auth = await assertProjectSecretAccess(request, projectId, 'write')
   if (!auth.ok) return auth.response
 
   try {
