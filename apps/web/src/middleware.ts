@@ -34,6 +34,8 @@ const PUBLIC_API_ROUTES = new Set([
   // transport would make mobile login impossible, so authorization for GraphQL
   // lives in the resolvers, which receive the verified user via context.
   '/api/graphql',
+  // App version management endpoint for mobile app startup version checks and API key updates
+  '/api/settings/app-management',
 ])
 
 /**
