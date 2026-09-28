@@ -26,6 +26,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Graceful "No Access" message when a user has lost access to a bug or
   task's project (previously showed a generic error)
+- Quick actions, swipe actions and the notification settings screen no
+  longer report "Success" when the change was actually refused
+- Approvals: no Approve/Reject buttons on your own requests, an empty team
+  no longer shows everyone else's pending requests, and failed attendance
+  decisions now say why
+- The security PIN is stored per user, so a second account on the same
+  device is no longer locked behind the first account's PIN, and the lock
+  screen now offers "Forgot PIN? Sign out"
+- Switching company refreshes every screen instead of only Settings
+- Project details shows edit and delete controls based on your role in
+  that project rather than your global role
+- Bug and task assignee lists are limited to members of the chosen project
+- Feature requests and releases are no longer labelled "Bug"
+- Requirements: sections written with formatting on the web are read-only
+  on mobile instead of being flattened, saving an unedited section no
+  longer creates a revision or reopens an approved requirement, and edit
+  controls only appear if you have requirements-edit access
+- Work-from-home details can be opened and deleted again (the screen was
+  reaching an endpoint that did not exist)
+- ID card no longer misspells the company name
 
 ---
 
