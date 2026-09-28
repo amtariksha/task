@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAccess } from '@/lib/auth-server'
+import { requireAuth, requireUserAccess } from '@/lib/auth-server'
 import { HalfDayService } from '@/lib/businessRules'
 import { getLeavesByEmployeeId } from '@/lib/db/leaves'
 import { getWFHByEmployeeId } from '@/lib/db/wfh'
@@ -23,6 +23,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (action === 'validate') {
+      // Pure date arithmetic, but still behind a session so the branch does not
+      // depend on the middleware gate alone.
+      const auth = await requireAuth(request)
+      if (!auth.ok) return auth.response
+
       if (!fromDate || !toDate || !type) {
         return NextResponse.json({
           success: false,

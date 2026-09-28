@@ -11,13 +11,16 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const { remarks } = await request.json()
 
+    // Authenticate BEFORE touching the body: parsing first meant an unauthorized
+    // caller sending no body got a 500 from JSON.parse instead of a 401.
     // approverId used to come from the request body unverified; it now comes
     // from the session, and canApproveFor blocks rejecting your own application.
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
     const approverId = auth.user.employeeId
+
+    const { remarks } = await request.json().catch(() => ({ remarks: undefined }))
 
     const existingWfh = await getWFHById(id)
     if (!existingWfh) {

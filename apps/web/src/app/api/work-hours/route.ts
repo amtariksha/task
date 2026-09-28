@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAccess } from '@/lib/auth-server'
+import { requireAuth, requireUserAccess } from '@/lib/auth-server'
+import { getVisibleEmployeeScope } from '@/lib/authz'
 import { WorkHoursService } from '@/lib/businessRules'
 
 export async function GET(request: NextRequest) {
@@ -10,6 +11,9 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date')
 
     if (action === 'report') {
+      const auth = await requireAuth(request)
+      if (!auth.ok) return auth.response
+
       if (!date) {
         return NextResponse.json({
           success: false,
@@ -17,7 +21,13 @@ export async function GET(request: NextRequest) {
         }, { status: 400 })
       }
 
-      const report = await WorkHoursService.getWorkHoursReport(date)
+      // The report covered every user in the database, so any signed-in employee
+      // could pull the whole organisation's hours and shortfalls for a date.
+      const scope = await getVisibleEmployeeScope(auth.user)
+      const report = await WorkHoursService.getWorkHoursReport(
+        date,
+        scope.all ? undefined : scope.employeeIds
+      )
       
       return NextResponse.json({
         success: true,

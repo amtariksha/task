@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireUserAccess } from '@/lib/auth-server'
-import { getAllWFH, createWFH } from '@/lib/db/wfh'
+import { requireAuth, requireUserAccess } from '@/lib/auth-server'
+import { getAllWFH, getWFHForEmployees, createWFH } from '@/lib/db/wfh'
+import { getVisibleEmployeeScope } from '@/lib/authz'
 import { withTimeout, query } from '@/lib/db/config'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    console.log('Fetching WFH applications from MySQL')
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
+
+    // This returned every WFH application in every company — names, dates,
+    // reasons and home addresses — to any signed-in user.
+    const scope = await getVisibleEmployeeScope(auth.user)
     const wfhApplications = await withTimeout(
-      getAllWFH(),
+      scope.all ? getAllWFH() : getWFHForEmployees(scope.employeeIds),
       10000,
       'Failed to fetch WFH applications - database timeout'
     )

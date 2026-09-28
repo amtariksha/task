@@ -1,16 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAllLeaves, createLeave } from '@/lib/db/leaves'
+import { getAllLeaves, getLeavesForEmployees, createLeave } from '@/lib/db/leaves'
 import { withTimeout, query } from '@/lib/db/config'
 import { requireAuth } from '@/lib/auth-server'
+import { getVisibleEmployeeScope } from '@/lib/authz'
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
 
-    console.log('Fetching leave applications from MySQL')
+    // Authenticated but unscoped: this returned every leave application in every
+    // company, including the stated reasons, to any signed-in user.
+    const scope = await getVisibleEmployeeScope(auth.user)
     const leaves = await withTimeout(
-      getAllLeaves(),
+      scope.all ? getAllLeaves() : getLeavesForEmployees(scope.employeeIds),
       10000,
       'Failed to fetch leave applications - database timeout'
     )

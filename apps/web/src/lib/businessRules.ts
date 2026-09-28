@@ -393,7 +393,11 @@ export class WorkHoursService {
   /**
    * Get work hours report for management
    */
-  static async getWorkHoursReport(date: string): Promise<Array<{
+  /**
+   * @param employeeIds - when given, only these employees appear in the report.
+   *   Callers pass the set the requester is allowed to see.
+   */
+  static async getWorkHoursReport(date: string, employeeIds?: string[]): Promise<Array<{
     employeeId: string
     employeeName: string
     requiredHours: number
@@ -402,7 +406,10 @@ export class WorkHoursService {
     status: 'compliant' | 'deficit' | 'holiday'
   }>> {
     try {
-      const users = await getAllUsers()
+      const allUsers = await getAllUsers()
+      const users = employeeIds
+        ? allUsers.filter((user) => employeeIds.includes(user.employeeId))
+        : allUsers
       const report = []
 
       for (const user of users) {

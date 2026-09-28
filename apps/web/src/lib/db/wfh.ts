@@ -59,6 +59,21 @@ export async function getAllWFH(): Promise<WFHApplication[]> {
   })
 }
 
+/**
+ * WFH applications for a set of employees. The list route used getAllWFH, which
+ * returned every application in every company to any signed-in user.
+ */
+export async function getWFHForEmployees(employeeIds: string[]): Promise<WFHApplication[]> {
+  if (employeeIds.length === 0) return []
+  return withRetry(async () => {
+    const rows = await query<WFHRow[]>(
+      'SELECT * FROM wfh_applications WHERE employee_id = ANY($1) ORDER BY created_at DESC',
+      [employeeIds]
+    )
+    return rows.map(rowToWFH)
+  })
+}
+
 // Get WFH by ID
 export async function getWFHById(id: string): Promise<WFHApplication | null> {
   return withRetry(async () => {

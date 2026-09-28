@@ -55,6 +55,21 @@ export async function getAllLeaves(): Promise<LeaveApplication[]> {
   })
 }
 
+/**
+ * Leave applications for a set of employees. The list route used getAllLeaves,
+ * which returned every application in every company to any signed-in user.
+ */
+export async function getLeavesForEmployees(employeeIds: string[]): Promise<LeaveApplication[]> {
+  if (employeeIds.length === 0) return []
+  return withRetry(async () => {
+    const rows = await query<LeaveRow[]>(
+      'SELECT * FROM leave_applications WHERE employee_id = ANY($1) ORDER BY created_at DESC',
+      [employeeIds]
+    )
+    return rows.map(rowToLeave)
+  })
+}
+
 // Get leave by ID
 export async function getLeaveById(id: string): Promise<LeaveApplication | null> {
   return withRetry(async () => {

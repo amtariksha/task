@@ -11,9 +11,9 @@ export async function POST(
 ) {
   try {
     const { id } = await params
-    const body = await request.json()
-    const remarks = body.remarks || body.reason
 
+    // Authenticate BEFORE touching the body: parsing first meant an unauthorized
+    // caller sending no body got a 500 from JSON.parse instead of a 401.
     // The approver used to come from the request body and was never verified,
     // so anyone could reject anyone's leave while attributing it to someone
     // else. It now comes from the verified session, and canApproveFor returns
@@ -21,6 +21,9 @@ export async function POST(
     const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
     const approverId = auth.user.employeeId
+
+    const body = await request.json().catch(() => ({} as Record<string, string>))
+    const remarks = body.remarks || body.reason
 
     const existingLeave = await getLeaveById(id)
     if (!existingLeave) {
