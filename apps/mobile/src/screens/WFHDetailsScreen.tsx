@@ -20,6 +20,7 @@ import { materialColors, materialTypography, materialSpacing } from '../config/m
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import { formatDateIST, formatTimeIST } from '../utils/datetime'
 import apiClient from '../services/apiClient'
+import { APPROVER_ROLES } from '../utils/permissions'
 
 interface WFHApplication {
   id: string
@@ -68,6 +69,10 @@ export default function WFHDetailsScreen() {
       const result = await apiClient.get(`/api/wfh/${wfhId}`)
       if (result.success && result.data) {
         setWFH(result.data)
+      } else {
+        // There was no else branch at all, so a 403 or 404 left the screen on a
+        // blank spinner-less card with no explanation.
+        Alert.alert('Error', result.error || result.message || 'Failed to load WFH details')
       }
     } catch (error) {
       console.error('Failed to fetch WFH details:', error)
@@ -79,12 +84,13 @@ export default function WFHDetailsScreen() {
 
   const canApprove = useCallback(() => {
     if (!currentUser || !wfh) return false
-    const approverRoles = ['top_management', 'management', 'amtarikshian']
-    return (
-      approverRoles.includes(currentUser.role) &&
-      wfh.status === 'Pending' &&
-      wfh.employeeId !== currentUser.employeeId
-    )
+    if (wfh.status !== 'Pending') return false
+    // Never your own request — the server refuses it too (authz.canApproveFor).
+    if (wfh.employeeId === currentUser.employeeId) return false
+    // 'amtarikshian' is the plain employee role, so this used to offer Approve to
+    // everyone while leaving it off for admins.
+    if (wfh.managerId && wfh.managerId === currentUser.employeeId) return true
+    return APPROVER_ROLES.includes(currentUser.role)
   }, [currentUser, wfh])
 
   const canDelete = useCallback(() => {
@@ -116,7 +122,6 @@ export default function WFHDetailsScreen() {
               const result = await apiClient.post(
                 `/api/wfh/${wfhId}/approve`,
                 {
-                  approverId: currentUser.employeeId,
                   remarks: remarks || null,
                 }
               )
@@ -158,7 +163,6 @@ export default function WFHDetailsScreen() {
               const result = await apiClient.post(
                 `/api/wfh/${wfhId}/reject`,
                 {
-                  approverId: currentUser.employeeId,
                   reason: remarks,
                   remarks: remarks,
                 }

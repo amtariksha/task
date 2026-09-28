@@ -112,6 +112,16 @@ export default function QuickActionsModal({
     }
   }
 
+  /**
+   * The task/bug services resolve with { success: false, error } instead of
+   * throwing, so every handler here `await`ed the call and then announced
+   * "Success" — including on a 403 from the server's authorization checks.
+   * Throwing turns the existing catch blocks into real error reporting.
+   */
+  const assertOk = (result: { success?: boolean; error?: string }, fallback: string) => {
+    if (!result?.success) throw new Error(result?.error || fallback)
+  }
+
   const handleStatusChange = async (newStatus: string) => {
     if (!item) return
     if (newStatus === item.status) {
@@ -120,11 +130,10 @@ export default function QuickActionsModal({
     }
     try {
       setSubmitting(true)
-      if (type === 'task') {
-        await updateTask(item.taskId, { status: newStatus })
-      } else {
-        await updateBug(item.bugId, { status: newStatus })
-      }
+      const result = type === 'task'
+        ? await updateTask(item.taskId, { status: newStatus })
+        : await updateBug(item.bugId, { status: newStatus })
+      assertOk(result, 'Failed to update status')
       Alert.alert('Success', `Status updated to: ${newStatus}`)
       onSuccess()
       onDismiss()
@@ -144,11 +153,10 @@ export default function QuickActionsModal({
     }
     try {
       setSubmitting(true)
-      if (type === 'task') {
-        await updateTask(item.taskId, { priority: newPriority })
-      } else {
-        await updateBug(item.bugId, { priority: newPriority })
-      }
+      const result = type === 'task'
+        ? await updateTask(item.taskId, { priority: newPriority })
+        : await updateBug(item.bugId, { priority: newPriority })
+      assertOk(result, 'Failed to update priority')
       Alert.alert('Success', `Priority updated to: ${newPriority}`)
       onSuccess()
       onDismiss()
@@ -169,11 +177,10 @@ export default function QuickActionsModal({
     }
     try {
       setSubmitting(true)
-      if (type === 'task') {
-        await updateTask(item.taskId, { assignedTo: newAssignee })
-      } else {
-        await updateBug(item.bugId, { assignedTo: newAssignee })
-      }
+      const result = type === 'task'
+        ? await updateTask(item.taskId, { assignedTo: newAssignee })
+        : await updateBug(item.bugId, { assignedTo: newAssignee })
+      assertOk(result, 'Failed to reassign')
       Alert.alert('Success', 'Assignee updated successfully')
       setAssignedTo(newAssignee)
       onSuccess()
@@ -193,11 +200,10 @@ export default function QuickActionsModal({
       const dateStr = selectedDate.toISOString().split('T')[0]
       try {
         setSubmitting(true)
-        if (type === 'task') {
-          await updateTask(item.taskId, { endDate: dateStr })
-        } else {
-          await updateBug(item.bugId, { endDate: dateStr })
-        }
+        const result = type === 'task'
+          ? await updateTask(item.taskId, { endDate: dateStr })
+          : await updateBug(item.bugId, { endDate: dateStr })
+        assertOk(result, 'Failed to update due date')
         Alert.alert('Success', 'Due date updated successfully')
         onSuccess()
         onDismiss()
@@ -214,21 +220,20 @@ export default function QuickActionsModal({
     if (!item || !commentText.trim()) return
     try {
       setSubmitting(true)
-      if (type === 'task') {
-        await post('/api/activity-log', {
-          entityType: 'task',
-          entityId: item.taskId,
-          actionType: 'comment',
-          description: commentText.trim(),
-          isComment: true
-        })
-      } else {
-        await addBugComment(
-          item.bugId,
-          commentText.trim(),
-          currentUser?.employeeId || 'system'
-        )
-      }
+      const result = type === 'task'
+        ? await post('/api/activity-log', {
+            entityType: 'task',
+            entityId: item.taskId,
+            actionType: 'comment',
+            description: commentText.trim(),
+            isComment: true
+          })
+        : await addBugComment(
+            item.bugId,
+            commentText.trim(),
+            currentUser?.employeeId || 'system'
+          )
+      assertOk(result, 'Failed to add comment')
       Alert.alert('Success', 'Comment added successfully')
       setCommentText('')
       onSuccess()
@@ -246,11 +251,10 @@ export default function QuickActionsModal({
     try {
       setSubmitting(true)
       const targetStatus = type === 'task' ? 'Done' : 'Resolved'
-      if (type === 'task') {
-        await updateTask(item.taskId, { status: targetStatus })
-      } else {
-        await updateBug(item.bugId, { status: targetStatus })
-      }
+      const result = type === 'task'
+        ? await updateTask(item.taskId, { status: targetStatus })
+        : await updateBug(item.bugId, { status: targetStatus })
+      assertOk(result, 'Failed to complete item')
       Alert.alert('Success', `${type === 'task' ? 'Task' : 'Bug'} marked as completed`)
       onSuccess()
       onDismiss()

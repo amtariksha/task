@@ -67,6 +67,20 @@ interface WfhRequest {
     createdAt: string
 }
 
+/**
+ * The server's own message out of an Apollo mutate result. Apollo is configured
+ * with errorPolicy 'all', so a FORBIDDEN from the server arrives as data on the
+ * result rather than as a thrown exception, and the shape differs between
+ * versions — hence the defensive read.
+ */
+const graphQLMessage = (result: unknown, fallback: string): string => {
+    const r = result as {
+        error?: { message?: string }
+        errors?: ReadonlyArray<{ message?: string }> | null
+    } | null
+    return r?.errors?.[0]?.message || r?.error?.message || fallback
+}
+
 export default function AttendanceApprovalsScreen() {
     const { colors } = useTheme()
     const responsive = useResponsive()
@@ -75,11 +89,15 @@ export default function AttendanceApprovalsScreen() {
     const [activeTab, setActiveTab] = useState<'attendance' | 'leaves' | 'wfh'>('attendance')
     const [currentUser, setCurrentUser] = useState<any>(null)
     const [teamMembers, setTeamMembers] = useState<string[]>([])
+    // Distinguishes "no team" from "team not fetched yet", so an empty team means
+    // an empty queue rather than no filter at all.
+    const [teamLoaded, setTeamLoaded] = useState(false)
 
     // Leaves & WFH states
     const [leaves, setLeaves] = useState<LeaveRequest[]>([])
     const [wfh, setWfh] = useState<WfhRequest[]>([])
     const [loadingREST, setLoadingREST] = useState(false)
+    const [restError, setRestError] = useState('')
 
     // Rejection Modal states
     const [rejectionModalVisible, setRejectionModalVisible] = useState(false)
@@ -106,11 +124,14 @@ export default function AttendanceApprovalsScreen() {
             const user = await getUserData()
             if (user) {
                 setCurrentUser(user)
-                const result = await apiClient.get(`/api/users/team/${user.employeeId}`)
+                // recursive=true: managers have managers, so a senior manager
+                // approves for their skip-level reports too.
+                const result = await apiClient.get(`/api/users/team/${user.employeeId}?recursive=true`)
                 const team = result.success ? result.data : []
                 if (Array.isArray(team)) {
                     setTeamMembers(team.map((m: any) => m.employeeId))
                 }
+                setTeamLoaded(true)
             }
         } catch (e) {
             console.error('Failed to load user/team in approvals:', e)
@@ -128,37 +149,49 @@ export default function AttendanceApprovalsScreen() {
             const roleLower = currentUser.role?.toLowerCase()
             const showAll = ['admin', 'top_management'].includes(roleLower)
 
+            // `teamMembers.length > 0` meant an employee with no reports got NO
+            // filter at all and saw every pending request in the list. The server
+            // now scopes these endpoints too, but the client must not fall open.
+            const restrictToTeam = (rows: any[]) =>
+                showAll ? rows : rows.filter((r: any) => teamMembers.includes(r.employeeId))
+
             // Fetch Leaves
             const leaveResult = await apiClient.get('/api/leaves')
             if (leaveResult.success) {
-                let pendingLeaves = (leaveResult.data || []).filter((l: any) => l.status === 'Pending')
-                if (!showAll && teamMembers.length > 0) {
-                    pendingLeaves = pendingLeaves.filter((l: any) => teamMembers.includes(l.employeeId))
-                }
+                const pendingLeaves = restrictToTeam(
+                    (leaveResult.data || []).filter((l: any) => l.status === 'Pending')
+                )
                 setLeaves(pendingLeaves)
+                setRestError('')
+            } else {
+                setLeaves([])
+                setRestError(leaveResult.error || 'Could not load pending leave requests.')
             }
 
             // Fetch WFH
             const wfhResult = await apiClient.get('/api/wfh')
             if (wfhResult.success) {
-                let pendingWfh = (wfhResult.data || []).filter((w: any) => w.status === 'Pending')
-                if (!showAll && teamMembers.length > 0) {
-                    pendingWfh = pendingWfh.filter((w: any) => teamMembers.includes(w.employeeId))
-                }
+                const pendingWfh = restrictToTeam(
+                    (wfhResult.data || []).filter((w: any) => w.status === 'Pending')
+                )
                 setWfh(pendingWfh)
+            } else {
+                setWfh([])
+                setRestError(wfhResult.error || 'Could not load pending WFH requests.')
             }
         } catch (e) {
             console.error('Failed to fetch Leaves & WFH:', e)
+            setRestError('Could not load pending requests. Check your connection and try again.')
         } finally {
             setLoadingREST(false)
         }
     }, [currentUser, teamMembers])
 
     useEffect(() => {
-        if (currentUser) {
+        if (currentUser && teamLoaded) {
             fetchLeavesAndWFH()
         }
-    }, [currentUser, fetchLeavesAndWFH, activeTab])
+    }, [currentUser, teamLoaded, fetchLeavesAndWFH, activeTab])
 
     const handleRefresh = useCallback(async () => {
         if (activeTab === 'attendance') {
@@ -180,9 +213,14 @@ export default function AttendanceApprovalsScreen() {
             if (res.data?.approveAttendanceRequest) {
                 Alert.alert('Success', 'Attendance request approved')
                 refetchAttendance()
+            } else {
+                // Apollo is configured with errorPolicy 'all', so a FORBIDDEN from
+                // the server resolves instead of throwing and this branch was the
+                // silent one.
+                Alert.alert('Error', graphQLMessage(res, 'Failed to approve attendance request'))
             }
         } catch (e) {
-            Alert.alert('Error', 'Failed to approve attendance request')
+            Alert.alert('Error', e instanceof Error ? e.message : 'Failed to approve attendance request')
         } finally {
             setApprovingId(null)
         }
@@ -195,9 +233,11 @@ export default function AttendanceApprovalsScreen() {
             if (res.data?.rejectAttendanceRequest) {
                 Alert.alert('Success', 'Attendance request rejected')
                 refetchAttendance()
+            } else {
+                Alert.alert('Error', graphQLMessage(res, 'Failed to reject attendance request'))
             }
         } catch (e) {
-            Alert.alert('Error', 'Failed to reject attendance request')
+            Alert.alert('Error', e instanceof Error ? e.message : 'Failed to reject attendance request')
         } finally {
             setRejectingId(null)
         }
@@ -206,8 +246,9 @@ export default function AttendanceApprovalsScreen() {
     // Leaves / WFH REST handlers
     const handleApproveLeave = async (id: string) => {
         try {
+            // No approverId: the server takes the approver from the verified
+            // session and ignores the body field (it used to trust it).
             const result = await apiClient.post(`/api/leaves/${id}/approve`, {
-                approverId: currentUser.employeeId,
                 remarks: 'Approved via Mobile App'
             })
             if (result.success) {
@@ -231,7 +272,6 @@ export default function AttendanceApprovalsScreen() {
     const handleApproveWFH = async (id: string) => {
         try {
             const result = await apiClient.post(`/api/wfh/${id}/approve`, {
-                approverId: currentUser.employeeId,
                 remarks: 'Approved via Mobile App'
             })
             if (result.success) {
@@ -261,7 +301,6 @@ export default function AttendanceApprovalsScreen() {
             setSubmittingRejection(true)
             const endpoint = rejectionType === 'leave' ? 'leaves' : 'wfh'
             const result = await apiClient.post(`/api/${endpoint}/${rejectionId}/reject`, {
-                approverId: currentUser.employeeId,
                 remarks: rejectionReasonText,
                 reason: rejectionReasonText
             })
@@ -283,6 +322,13 @@ export default function AttendanceApprovalsScreen() {
         }
     }
 
+    /**
+     * Nobody approves their own request — the server refuses it outright
+     * (lib/authz.canApproveFor), so offering the buttons only produced a 403.
+     */
+    const isOwn = (employeeId: string) =>
+        Boolean(currentUser?.employeeId) && employeeId === currentUser.employeeId
+
     const renderAttendanceItem = ({ item }: { item: AttendanceRequest }) => (
         <Card style={styles.card}>
             <Card.Content>
@@ -296,10 +342,14 @@ export default function AttendanceApprovalsScreen() {
                 )}
                 <View style={styles.row}><Text style={styles.label}>New:</Text><Text style={styles.value}>{formatDateTimeIST(item.newTime)}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Reason:</Text><Text style={styles.value}>{item.reason}</Text></View>
+                {isOwn(item.userId) ? (
+                    <Text style={styles.ownNote}>Your own request — waiting for your manager.</Text>
+                ) : (
                 <View style={styles.actions}>
                     <Button mode="contained" onPress={() => handleApproveAttendance(item.id)} loading={approvingId === item.id} disabled={!!approvingId || !!rejectingId} style={styles.approveBtn}>Approve</Button>
                     <Button mode="outlined" onPress={() => handleRejectAttendance(item.id)} loading={rejectingId === item.id} disabled={!!approvingId || !!rejectingId} style={styles.rejectBtn} textColor={colors.error}>Reject</Button>
                 </View>
+                )}
             </Card.Content>
         </Card>
     )
@@ -314,10 +364,14 @@ export default function AttendanceApprovalsScreen() {
                 <View style={styles.row}><Text style={styles.label}>From:</Text><Text style={styles.value}>{formatDateIST(item.fromDate)}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>To:</Text><Text style={styles.value}>{formatDateIST(item.toDate)}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Reason:</Text><Text style={styles.value}>{item.reason}</Text></View>
+                {isOwn(item.employeeId) ? (
+                    <Text style={styles.ownNote}>Your own request — waiting for your manager.</Text>
+                ) : (
                 <View style={styles.actions}>
                     <Button mode="contained" onPress={() => handleApproveLeave(item.id)} style={styles.approveBtn}>Approve</Button>
                     <Button mode="outlined" onPress={() => openRejectLeave(item.id)} style={styles.rejectBtn} textColor={colors.error}>Reject</Button>
                 </View>
+                )}
             </Card.Content>
         </Card>
     )
@@ -333,10 +387,14 @@ export default function AttendanceApprovalsScreen() {
                 <View style={styles.row}><Text style={styles.label}>To:</Text><Text style={styles.value}>{formatDateIST(item.toDate)}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Location:</Text><Text style={styles.value}>{item.workLocation}</Text></View>
                 <View style={styles.row}><Text style={styles.label}>Reason:</Text><Text style={styles.value}>{item.reason}</Text></View>
+                {isOwn(item.employeeId) ? (
+                    <Text style={styles.ownNote}>Your own request — waiting for your manager.</Text>
+                ) : (
                 <View style={styles.actions}>
                     <Button mode="contained" onPress={() => handleApproveWFH(item.id)} style={styles.approveBtn}>Approve</Button>
                     <Button mode="outlined" onPress={() => openRejectWFH(item.id)} style={styles.rejectBtn} textColor={colors.error}>Reject</Button>
                 </View>
+                )}
             </Card.Content>
         </Card>
     )
@@ -382,7 +440,11 @@ export default function AttendanceApprovalsScreen() {
                     }
                     ListEmptyComponent={
                         <View style={styles.centered}>
-                            <Text style={styles.emptyText}>No pending requests</Text>
+                            <Text style={styles.emptyText}>
+                                {activeTab !== 'attendance' && restError
+                                    ? restError
+                                    : 'No pending requests'}
+                            </Text>
                         </View>
                     }
                 />
@@ -483,6 +545,12 @@ const getStyles = (colors: any, responsive: any) => StyleSheet.create({
         justifyContent: 'flex-end',
         marginTop: materialSpacing.md,
         gap: materialSpacing.sm,
+    },
+    ownNote: {
+        ...materialTypography.bodySmall,
+        color: colors.textSecondary,
+        marginTop: materialSpacing.md,
+        fontStyle: 'italic',
     },
     approveBtn: {
         backgroundColor: colors.success || materialColors.success,

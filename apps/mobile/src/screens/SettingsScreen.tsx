@@ -818,7 +818,7 @@ export default function SettingsScreen() {
               <View style={styles.idCardBody}>
                 <View style={styles.idCardHeader}>
                   <MaterialCommunityIcons name="shield-check" size={24} color={colors.primary} />
-                  <Text style={styles.companyName}>Amstarikha</Text>
+                  <Text style={styles.companyName}>Amtariksha</Text>
                 </View>
                 <View style={styles.idCardMain}>
                   {user?.idCardPhoto ? (

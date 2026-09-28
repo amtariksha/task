@@ -728,32 +728,10 @@ export const CREATE_LEAVE_APPLICATION = gql`
   }
 `
 
-export const APPROVE_LEAVE = gql`
-  mutation ApproveLeave($id: ID!, $approverId: String!, $remarks: String) {
-    approveLeave(id: $id, approverId: $approverId, remarks: $remarks) {
-      success
-      message
-    }
-  }
-`
-
-export const REJECT_LEAVE = gql`
-  mutation RejectLeave($id: ID!, $approverId: String!, $reason: String!) {
-    rejectLeave(id: $id, approverId: $approverId, reason: $reason) {
-      success
-      message
-    }
-  }
-`
-
-export const DELETE_LEAVE = gql`
-  mutation DeleteLeave($id: ID!) {
-    deleteLeave(id: $id) {
-      success
-      message
-    }
-  }
-`
+// Leave decisions go through the REST routes (/api/leaves/[id]/approve|reject).
+// The APPROVE_LEAVE / REJECT_LEAVE / DELETE_LEAVE mutations that used to live here
+// were never in the server schema and nothing imported them; they also took an
+// $approverId, which the server now refuses to trust from the client.
 
 // ============================================================================
 // WFH Applications
@@ -822,32 +800,8 @@ export const CREATE_WFH_APPLICATION = gql`
   }
 `
 
-export const APPROVE_WFH = gql`
-  mutation ApproveWFH($id: ID!, $approverId: String!, $remarks: String) {
-    approveWFH(id: $id, approverId: $approverId, remarks: $remarks) {
-      success
-      message
-    }
-  }
-`
-
-export const REJECT_WFH = gql`
-  mutation RejectWFH($id: ID!, $approverId: String!, $reason: String!) {
-    rejectWFH(id: $id, approverId: $approverId, reason: $reason) {
-      success
-      message
-    }
-  }
-`
-
-export const DELETE_WFH = gql`
-  mutation DeleteWFH($id: ID!) {
-    deleteWFH(id: $id) {
-      success
-      message
-    }
-  }
-`
+// WFH decisions go through the REST routes, as above — the approveWFH /
+// rejectWFH / deleteWFH mutations here were not in the server schema either.
 
 // ============================================================================
 // ATTENDANCE
