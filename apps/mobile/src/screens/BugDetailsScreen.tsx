@@ -23,7 +23,9 @@ import {
 import ReleaseChecklistView from '../components/ReleaseChecklistView'
 import { ReleaseState } from '../types'
 import { getCurrentUser, User } from '../services/userService'
-import { getStatusColor, getStatusTextColor, getSeverityColor, getSeverityTextColor } from '../utils/bugHelpers'
+import { getStatusColor, getStatusTextColor, getSeverityColor, getSeverityTextColor,
+  getBugTypeDisplayName,
+} from '../utils/bugHelpers'
 import { useRoute, useNavigation } from '@react-navigation/native'
 import BugSubtasks from '../components/BugSubtasks'
 import { useTheme } from '../contexts/ThemeContext'
@@ -153,7 +155,7 @@ export default function BugDetailsScreen() {
       const response = await updateBug(bugId, updates)
 
       if (response.success) {
-        Alert.alert('Success', 'Bug updated successfully')
+        Alert.alert('Success', `${getBugTypeDisplayName(bug?.type)} updated successfully`)
         setIsEditing(false)
         loadData()
       } else {
@@ -268,12 +270,15 @@ export default function BugDetailsScreen() {
   if (!bug) {
     return (
       <Surface style={styles.errorContainer} elevation={0}>
-        <Text style={styles.errorText}>Bug not found</Text>
+        <Text style={styles.errorText}>Item not found</Text>
       </Surface>
     )
   }
 
   const isRelease = bug.type === 'release'
+  // Features, bugs and releases all live in the bugs table; the headings said
+  // "Bug" regardless of which one the user actually filed.
+  const itemNoun = getBugTypeDisplayName(bug.type)
 
   return (
     <View style={styles.container}>
@@ -421,7 +426,7 @@ export default function BugDetailsScreen() {
         {/* Bug Information Card */}
         <Card style={styles.sectionCard} elevation={1}>
           <Card.Content>
-            <Text style={styles.sectionTitle}>Bug Information</Text>
+            <Text style={styles.sectionTitle}>{itemNoun} Information</Text>
             <Divider style={styles.divider} />
             <View style={styles.infoGrid}>
               <View style={styles.infoItem}>
@@ -509,7 +514,7 @@ export default function BugDetailsScreen() {
         {!isRelease && (
           <Card style={styles.sectionCard} elevation={1}>
             <Card.Content>
-              <Text style={styles.sectionTitle}>Bug Flow</Text>
+              <Text style={styles.sectionTitle}>{itemNoun} Flow</Text>
               <Divider style={styles.divider} />
               <BugFlow currentStatus={bug.status} />
             </Card.Content>

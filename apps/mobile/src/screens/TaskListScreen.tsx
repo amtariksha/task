@@ -142,11 +142,9 @@ export default function TaskListScreen({ navigation }: any) {
     const updateStatus = (list: Task[]) =>
       list.map(t => (t.taskId === item.taskId ? { ...t, status: newStatus } : t))
 
+    // Optimistic list update is fine — it reverts below if the server refuses.
     setTasks(updateStatus(tasks))
     setFilteredTasks(updateStatus(filteredTasks))
-
-    // Display instant feedback toast
-    Alert.alert('Success', `Task updated to ${newStatus}`)
 
     try {
       const res = await updateTask(item.taskId, { status: newStatus })
@@ -156,6 +154,9 @@ export default function TaskListScreen({ navigation }: any) {
         setFilteredTasks(previousFiltered)
         Alert.alert('Error', res.error || 'Failed to update task')
       } else {
+        // The success alert used to fire BEFORE the request, so a swipe on a task
+        // the server refused to update said "Success" and then "Error".
+        Alert.alert('Success', `Task updated to ${newStatus}`)
         fetchTasks()
       }
     } catch (error) {

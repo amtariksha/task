@@ -33,7 +33,7 @@ import { useNavigation } from '@react-navigation/native'
 import { useQuery } from '@apollo/client/react'
 import { GET_BUGS, GET_PROJECTS, GET_USERS, GET_SETTINGS } from '../config/graphql-queries'
 import { Project, Bug, BugFilters } from '../types'
-import { getBugDisplayId, getSeverityColor, getStatusColor, getStatusTextColor } from '../utils/bugHelpers'
+import { getBugDisplayId, getBugTypeDisplayName, getSeverityColor, getStatusColor, getStatusTextColor } from '../utils/bugHelpers'
 import { formatDateIST } from '../utils/datetime'
 import { save, get, getUserData, STORAGE_KEYS } from '../utils/secureStorage'
 import { FilterHeader, FilterSection, FilterSearch, FilterToggle } from '../components/FilterComponents'
@@ -714,7 +714,7 @@ export default function BugListScreen() {
                     showSelectedOverlay
                     selectedColor={colors.primary}
                   >
-                    {t.charAt(0).toUpperCase() + t.slice(1)}
+                    {getBugTypeDisplayName(t)}
                   </Chip>
                 ))}
               </View>

@@ -17,6 +17,13 @@ interface ProjectFilterContextType {
   isLoading: boolean
   error: string | null
   refreshProjects: () => Promise<void>
+  /**
+   * Forget the current selection and reload the project list. Called after a
+   * company switch: the saved project IDs belong to the previous company, so
+   * leaving them in place filtered every screen by projects the new session
+   * cannot even see.
+   */
+  resetForCompanySwitch: () => Promise<void>
 }
 
 const ProjectFilterContext = createContext<ProjectFilterContextType | undefined>(undefined)
@@ -76,6 +83,16 @@ export function ProjectFilterProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  const resetForCompanySwitch = useCallback(async () => {
+    setSelectedProjectIdsState([])
+    try {
+      await AsyncStorage.removeItem('selectedProjectIds')
+    } catch (e) {
+      console.error('Failed to clear selected projects from AsyncStorage', e)
+    }
+    await fetchProjects()
+  }, [fetchProjects])
+
   return (
     <ProjectFilterContext.Provider
       value={{
@@ -85,6 +102,7 @@ export function ProjectFilterProvider({ children }: { children: ReactNode }) {
         isLoading: isLoading || !isHydrated,
         error,
         refreshProjects: fetchProjects,
+        resetForCompanySwitch,
       }}
     >
       {children}

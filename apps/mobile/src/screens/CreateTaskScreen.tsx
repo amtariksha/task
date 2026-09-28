@@ -188,6 +188,17 @@ export default function CreateTaskScreen({ navigation }: any) {
     }
   }, [projectId, loadSubprojects, loadProjectUsers])
 
+  // The assignee defaults to the signed-in user before any project is chosen, so
+  // it can end up naming someone who is not a member of the project that was
+  // picked. The pickers are scoped to members; clear a stale value rather than
+  // submitting an assignee the server will reject.
+  useEffect(() => {
+    if (!assignedTo || projectUsers.length === 0) return
+    if (!projectUsers.some((u: any) => u.employeeId === assignedTo)) {
+      setAssignedTo('')
+    }
+  }, [projectUsers, assignedTo])
+
   const validateTimeFormat = useCallback((time: string): boolean => {
     const timeRegex = /^(\d{1,2}):(\d{2}):(\d{2})$/
     const match = time.match(timeRegex)

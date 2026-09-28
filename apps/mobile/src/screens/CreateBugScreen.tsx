@@ -18,6 +18,8 @@ import { MultiSelectPicker } from '../components/MultiSelectPicker'
 import DateTimePicker from '@react-native-community/datetimepicker'
 import * as DocumentPicker from 'expo-document-picker'
 import { createBug, getCompletedBugsForRelease, Bug } from '../services/bugService'
+import { getBugTypeDisplayName } from '../utils/bugHelpers'
+import { get as apiGet } from '../services/apiClient'
 import { getProjectHierarchy, getProjectById } from '../services/projectService'
 import { getAllSettings, GroupedSettings } from '../services/settingsService'
 import { getAllUsers, getCurrentUser, User } from '../services/userService'
@@ -111,6 +113,13 @@ export default function CreateBugScreen() {
   const [settings, setSettings] = useState<GroupedSettings>({})
   const [users, setUsers] = useState<User[]>([])
   const [currentUser, setCurrentUser] = useState<User | null>(null)
+  /**
+   * Members of the chosen project/sub-project. The Assign To picker listed every
+   * user in the company, so a bug could be assigned to someone with no access to
+   * the project — they then could not see or update it. CreateTaskScreen already
+   * scopes its pickers this way.
+   */
+  const [projectUsers, setProjectUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
@@ -408,7 +417,7 @@ export default function CreateBugScreen() {
 
       if (response.success) {
         const newBugId = (response.data as any)?.bugId
-        Alert.alert('Success', isReleaseMode ? 'Release created successfully' : 'Bug created successfully', [
+        Alert.alert('Success', `${getBugTypeDisplayName(bugType)} created successfully`, [
           {
             text: 'OK',
             onPress: () => {
@@ -468,6 +477,42 @@ export default function CreateBugScreen() {
       cancelled = true
     }
   }, [subprojectId])
+
+  // Members of the sub-project if one is chosen, otherwise of the main project.
+  useEffect(() => {
+    const scopeId = subprojectId || projectId
+    if (!scopeId) {
+      setProjectUsers([])
+      return
+    }
+    let cancelled = false
+    apiGet(`/api/projects/${scopeId}/users`)
+      .then((res: any) => {
+        if (cancelled) return
+        const rows = res?.success && Array.isArray(res.data) ? res.data : []
+        setProjectUsers(
+          rows.map((pu: any) => ({
+            employeeId: pu.employeeId,
+            name: pu.userName || pu.name || pu.employeeId,
+          }))
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setProjectUsers([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, subprojectId])
+
+  // Clear an assignee who is not a member of the newly chosen project — including
+  // the signed-in user, who is the default on the task screen.
+  useEffect(() => {
+    if (!assignedTo || projectUsers.length === 0) return
+    if (!projectUsers.some((u) => u.employeeId === assignedTo)) {
+      setAssignedTo('')
+    }
+  }, [projectUsers, assignedTo])
 
   // If the chosen type is 'release' but the sub is no longer release-enabled, reset.
   useEffect(() => {
@@ -849,11 +894,11 @@ export default function CreateBugScreen() {
             placeholder="Select User"
             selectedValue={assignedTo}
             onValueChange={setAssignedTo}
-            items={users.map((user: any, index: number) => ({
+            items={(projectUsers.length > 0 ? projectUsers : users).map((user: any) => ({
               label: user.name || user.employeeId || '',
               value: user.employeeId || '',
             }))}
-            disabled={isOffline}
+            disabled={isOffline || !projectId}
           />
 
           {/* Bug-only metadata — environment/severity are locked for releases */}
@@ -965,7 +1010,7 @@ export default function CreateBugScreen() {
             style={styles.submitButton}
             buttonColor={colors.primary}
           >
-            {isSubmitting ? 'Creating...' : isReleaseMode ? 'Create Release' : 'Create Bug'}
+            {isSubmitting ? 'Creating...' : `Create ${getBugTypeDisplayName(bugType)}`}
           </Button>
         </Surface>
       </ScrollView>

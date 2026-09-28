@@ -151,8 +151,8 @@ export default function DashboardScreen() {
 
             <Card style={styles.actionCardHorizontal} elevation={1} onPress={() => (navigation as any).navigate('CreateBug')}>
               <Card.Content>
-                <Text style={styles.actionTitle}>🐛 Report Bug</Text>
-                <Text style={styles.actionDescription}>Report a new bug</Text>
+                <Text style={styles.actionTitle}>🐛 Report Bug or Feature</Text>
+                <Text style={styles.actionDescription}>Log a bug, feature request or release</Text>
               </Card.Content>
             </Card>
 
