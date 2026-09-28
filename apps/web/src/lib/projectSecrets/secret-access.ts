@@ -32,12 +32,9 @@ export type SecretAction = 'view' | 'reveal' | 'write' | 'export'
 /** Project roles that may change a project's secrets. */
 const SECRET_WRITER_ROLES = ['manager', 'team_leader']
 
-/** Global roles that behave as company admins on projects with no company yet. */
-const LEGACY_ADMIN_ROLES = ['admin', 'top_management']
-
 export interface SecretActor {
   employeeId: string
-  /** Global users.role — legacy, only consulted for projects with no company. */
+  /** Global users.role. Deliberately NOT consulted here — see the note below. */
   role?: string
   /** Company this session is acting in. */
   companyId?: string | null
@@ -94,11 +91,14 @@ export async function decideProjectSecretAccess(
       return denied(403, NO_PROJECT_ACCESS_MESSAGE)
     }
     if (await deps.canAdminCompany(actor, projectCompanyId)) return ALLOWED
-  } else if (actor.role && LEGACY_ADMIN_ROLES.includes(actor.role)) {
-    // A project with no company cannot belong to another tenant, so the
-    // pre-tenancy rule still applies to it.
-    return ALLOWED
   }
+  // A project with NO company (a row migration 062's backfill could not resolve)
+  // falls straight through to the project-role check below. There is deliberately
+  // no global-role shortcut here: `users.role` is the old deployment-wide column,
+  // so honouring it would let an 'admin' or 'top_management' user of ANY company
+  // read and rewrite such a project's credentials without belonging to the project
+  // or its company. authz.canManageProject and canViewProject have no such
+  // shortcut either; secrets must not be looser than the project itself.
 
   const projectRole = await deps.getProjectRole(projectId, actor.employeeId)
   if (projectRole === null) return denied(403, NO_PROJECT_ACCESS_MESSAGE)

@@ -58,6 +58,10 @@ export async function GET(request: NextRequest) {
     // Topics have belonged to a company since migration 062, but this query
     // ignored the column, so every tenant saw every other tenant's topic names.
     // Rows with a NULL company are pre-062 leftovers and stay visible to all.
+    //
+    // Fails OPEN for a session with no companyId — a token issued before 062 —
+    // the same deliberate fallback authz.isSameCompany makes, so nobody loses
+    // access to their own feed mid-rollout. Those tokens expire within 7 days.
     if (user.companyId && !user.isPlatformAdmin) {
       params.push(user.companyId)
       sql += ` AND (company_id IS NULL OR company_id = $${params.length})`

@@ -173,10 +173,24 @@ describe('edge cases', () => {
     })
   })
 
-  // A project with no company cannot belong to another tenant, so the
-  // pre-tenancy rule still applies to it.
-  test('a legacy project with no company falls back to the global admin role', async () => {
-    assert.deepEqual(await decide(companyAdminB, 'PRJ-LEGACY', 'write'), { allowed: true })
+  // A project migration 062 could not stamp with a company has NO global-role
+  // shortcut: users.role is the old deployment-wide column, so honouring it would
+  // let an admin of any company read and rewrite such a project's credentials.
+  test('a project with no company grants nothing on a global role alone', async () => {
+    for (const actor of [companyAdminA, companyAdminB]) {
+      assert.deepEqual(await decide(actor, 'PRJ-LEGACY', 'write'), {
+        allowed: false,
+        status: 403,
+        message: NO_PROJECT_ACCESS_MESSAGE,
+      })
+      assert.equal((await decide(actor, 'PRJ-LEGACY', 'view')).allowed, false)
+    }
+  })
+
+  test('a project with no company still answers to its project roles', async () => {
+    // PRJ-LEGACY has no members in the fixture, so nobody but a platform admin
+    // reaches it — which is the point: it is not looser than the project itself.
     assert.equal((await decide(projectMember, 'PRJ-LEGACY', 'view')).allowed, false)
+    assert.deepEqual(await decide(platformAdmin, 'PRJ-LEGACY', 'write'), { allowed: true })
   })
 })

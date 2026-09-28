@@ -13,7 +13,7 @@ import { Alert } from 'react-native'
 import { Text, Button } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
-import { getCurrentUserPin } from '../utils/secureStorage'
+import { deleteUserPin, getCurrentUserPin, getUserData } from '../utils/secureStorage'
 import { AuthContext } from '../contexts/AuthContext'
 import {
   isBiometricSupported,
@@ -103,14 +103,36 @@ export default function PinLockScreen({ onUnlock }: PinLockScreenProps) {
    * The lock screen had no exit: someone who had forgotten their PIN and had no
    * biometrics enrolled could not reach the app or the sign-in screen at all, and
    * reinstalling was the only way out.
+   *
+   * The PIN has to be cleared as part of this, not just the session. It is keyed
+   * per user and deliberately survives an ordinary sign-out, so signing out alone
+   * would drop the caller back onto this same screen behind the same forgotten PIN
+   * as soon as they signed in again.
    */
   const handleSignOut = () => {
     Alert.alert(
-      'Sign out?',
-      'You will need to sign in again. Use this if you have forgotten your PIN.',
+      'Sign out and clear PIN?',
+      'Your security PIN will be removed and you will need to sign in again and set ' +
+        'a new one. Use this if you have forgotten your PIN.',
       [
         { text: 'Cancel', style: 'cancel' },
-        { text: 'Sign out', style: 'destructive', onPress: () => { void signOut() } },
+        {
+          text: 'Sign out',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                const employeeId = (await getUserData<{ employeeId?: string }>())?.employeeId
+                if (employeeId) await deleteUserPin(employeeId)
+              } catch (err) {
+                // Sign out regardless: being stuck behind the lock screen is worse
+                // than a PIN that outlives the session.
+                console.error('Could not clear the PIN before signing out:', err)
+              }
+              await signOut()
+            })()
+          },
+        },
       ]
     )
   }

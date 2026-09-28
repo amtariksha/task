@@ -18,7 +18,7 @@ import {
   setProjectRole,
   type ProjectRole,
 } from '@/lib/db/project-users'
-import { requireAuth, requireRole } from '@/lib/auth-server'
+import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
 
 const VALID_PROJECT_ROLES: ProjectRole[] = ['manager', 'team_leader', 'member']
@@ -58,7 +58,9 @@ export async function GET(
  * POST /api/projects/[projectId]/users
  *
  * Assign a user to the project
- * Body: { employeeId: string, assignedBy: string, canEditRequirements?: boolean }
+ * Body: { employeeId: string, canEditRequirements?: boolean }
+ *
+ * `assignedBy` is taken from the session; a value in the body is ignored.
  */
 export async function POST(
   request: NextRequest,
@@ -66,12 +68,27 @@ export async function POST(
 ) {
   try {
     const { projectId } = await params
-    const body = await request.json()
-    const { employeeId, assignedBy, canEditRequirements } = body
 
-    if (!employeeId || !assignedBy) {
+    // This route had NO authorization at all, so any signed-in user could add
+    // anyone — themselves included — to any project in any company. Project
+    // membership is what grants access to that project's tasks, bugs and stored
+    // secrets, so this was a one-request privilege escalation.
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
+    if (!(await canManageProject(auth.user, projectId))) {
       return NextResponse.json(
-        { success: false, error: 'employeeId and assignedBy are required' },
+        { success: false, error: 'You do not manage this project.' },
+        { status: 403 }
+      )
+    }
+
+    const body = await request.json()
+    const { employeeId, canEditRequirements } = body
+    const assignedBy = auth.user.employeeId
+
+    if (!employeeId) {
+      return NextResponse.json(
+        { success: false, error: 'employeeId is required' },
         { status: 400 }
       )
     }
@@ -119,13 +136,15 @@ export async function PATCH(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const auth = await requireRole(request, ['admin', 'top_management', 'management'])
+    const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
 
     const { projectId } = await params
 
-    // Only someone who manages THIS project may change roles or flags on it —
-    // a global role is no longer sufficient now that authority is per project.
+    // Only someone who manages THIS project may change roles or flags on it.
+    // The global-role gate that used to sit in front of this also EXCLUDED a
+    // project manager whose global role is plain 'employee', which is exactly the
+    // person per-project roles exist for.
     if (!(await canManageProject(auth.user, projectId))) {
       return NextResponse.json(
         { success: false, error: 'You do not manage this project.' },
@@ -205,10 +224,19 @@ export async function DELETE(
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const auth = await requireRole(request, ['admin', 'top_management', 'management'])
+    const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
 
     const { projectId } = await params
+
+    // A global role was enough here, so any 'management' user could strip members
+    // from any project in any company. Authority over a project is per project.
+    if (!(await canManageProject(auth.user, projectId))) {
+      return NextResponse.json(
+        { success: false, error: 'You do not manage this project.' },
+        { status: 403 }
+      )
+    }
     const body = await request.json()
     const { employeeId } = body
 
