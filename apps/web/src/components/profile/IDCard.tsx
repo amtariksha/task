@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { User } from '@/lib/types'
 import { getRoleDisplayName } from '@/lib/auth'
@@ -23,6 +23,33 @@ interface IDCardProps {
 
 export default function IDCard({ user }: IDCardProps) {
   const [showModal, setShowModal] = useState(false)
+  const [companyName, setCompanyName] = useState('Karmayog')
+
+  // The card is an identity document for the company the holder actually works
+  // for, so it carries that company's name rather than the product's. Falls back
+  // to the product name, which is what it always showed.
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      try {
+        const res = await fetch('/api/companies', { credentials: 'include' })
+        if (!res.ok) return
+        const json = await res.json()
+        const companies: Array<{ companyId: string; name: string; isDefault?: boolean }> = json?.data || []
+        const mine =
+          companies.find((c) => c.companyId === (user as { companyId?: string }).companyId) ||
+          companies.find((c) => c.isDefault) ||
+          companies[0]
+        if (!cancelled && mine?.name) setCompanyName(mine.name)
+      } catch {
+        // Cosmetic: keep the fallback rather than blanking the card.
+      }
+    }
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [user])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -33,7 +60,7 @@ export default function IDCard({ user }: IDCardProps) {
   }
 
   const generateQRData = () => {
-    return `Karmayog-${user.employeeId}-${user.name}-${user.department}`
+    return `${companyName}-${user.employeeId}-${user.name}-${user.department}`
   }
 
   const handlePrint = () => {
@@ -272,7 +299,7 @@ export default function IDCard({ user }: IDCardProps) {
                         <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-orange-500 to-orange-600 rounded-full mb-3 shadow-lg">
                           <Shield className="h-10 w-10 text-white" />
                         </div>
-                        <h3 className="text-2xl font-bold text-gray-900">Karmayog</h3>
+                        <h3 className="text-2xl font-bold text-gray-900">{companyName}</h3>
                       </div>
 
                       {/* Employee Photo and Name */}

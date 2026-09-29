@@ -87,6 +87,13 @@ export function getUserCredentialsHtmlTemplate(data: {
   role?: string
   manager?: string
   baseUrl?: string
+  /**
+   * The company the new user is joining. The template used to hardcode one brand,
+   * which is wrong on a deployment serving several companies — somebody's first
+   * ever email from the product should carry their own company's name.
+   */
+  companyName?: string
+  logoUrl?: string
 }) {
   const template = readTemplate('USER_CREDENTIALS')
   
@@ -99,6 +106,8 @@ export function getUserCredentialsHtmlTemplate(data: {
     role: data.role || 'Employee',
     manager: data.manager || 'Not assigned',
     baseUrl: data.baseUrl || 'http://localhost:3000',
+    companyName: data.companyName || 'Amtariksha',
+    logoUrl: data.logoUrl || `${data.baseUrl || ''}/images/logos/amtariksha_icon.png`,
     currentYear: new Date().getFullYear()
   }
   

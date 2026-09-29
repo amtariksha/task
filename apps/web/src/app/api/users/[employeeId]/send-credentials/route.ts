@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getUserByEmployeeId, updateUser } from '@/lib/db/users'
+import { getDefaultCompanyId } from '@/lib/db/companies'
 import { emailService } from '@/lib/email/service'
 import { requireRole } from '@/lib/auth-server'
 
@@ -72,7 +73,10 @@ export async function POST(
       managerName = manager?.name
     }
 
-    // Send credentials email using password from MySQL
+    // Brand the mail with the recipient's OWN company, not the platform default:
+    // this is usually the first email they ever get from the product.
+    const recipientCompanyId = await getDefaultCompanyId(employeeId).catch(() => null)
+
     const emailResult = await emailService.sendUserCredentialsEmail({
       userEmail: user.email,
       userName: user.name,
@@ -81,6 +85,7 @@ export async function POST(
       department: user.department || 'Not specified',
       role: user.role || 'Employee',
       manager: managerName,
+      companyId: recipientCompanyId,
     })
 
     if (emailResult.success) {
