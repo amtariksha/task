@@ -10,13 +10,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.3.0] — 2026-09-29
+
 ### Added
 - Convert test cases to bugs directly from the bug detail screen
 - Display Expected Behavior, Actual Behavior, Server Logs, Frontend Logs
   on bug detail screens when populated
 - Sign in with email address in addition to employee ID
-
-### Added
 - **Project secrets** (read-only): credential names and environment keys per
   project, revealing one value at a time behind a fingerprint or face
   prompt. Screenshots are blocked on that screen, a revealed value hides
