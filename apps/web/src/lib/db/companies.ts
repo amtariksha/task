@@ -132,6 +132,97 @@ export async function getCompanyMemberIds(companyId: string): Promise<string[]> 
   })
 }
 
+export interface CompanyMember {
+  employeeId: string
+  name: string
+  email: string
+  department: string | null
+  /** Global users.role, shown for context — not what grants company authority. */
+  globalRole: string
+  status: string
+  companyRole: CompanyRole
+  isDefault: boolean
+  isPlatformAdmin: boolean
+  joinedAt?: string
+}
+
+/**
+ * Everyone in a company, with the detail the Company admin page needs. Ordered
+ * admins first so the people who can change things are at the top.
+ */
+export async function getCompanyMembers(companyId: string): Promise<CompanyMember[]> {
+  return withRetry(async () => {
+    const rows = await query<Array<{
+      employee_id: string
+      name: string
+      email: string
+      department: string | null
+      global_role: string
+      status: string
+      company_role: string
+      is_default: boolean
+      is_platform_admin: boolean
+      created_at?: string
+    }>>(
+      `SELECT u.employee_id, u.name, u.email, u.department,
+              u.role AS global_role, u.status,
+              uc.company_role, uc.is_default, uc.created_at,
+              COALESCE(u.is_platform_admin, FALSE) AS is_platform_admin
+         FROM user_companies uc
+         JOIN users u ON u.employee_id = uc.employee_id
+        WHERE uc.company_id = $1
+        ORDER BY (uc.company_role = 'company_admin') DESC,
+                 CASE WHEN u.status = 'active' THEN 0 ELSE 1 END,
+                 u.name`,
+      [companyId]
+    )
+    return rows.map((row) => ({
+      employeeId: row.employee_id,
+      name: row.name,
+      email: row.email,
+      department: row.department || null,
+      globalRole: row.global_role,
+      status: row.status,
+      companyRole: row.company_role as CompanyRole,
+      isDefault: Boolean(row.is_default),
+      isPlatformAdmin: Boolean(row.is_platform_admin),
+      joinedAt: row.created_at,
+    }))
+  })
+}
+
+/**
+ * Change an existing member's company role. Returns false when they are not a
+ * member — deliberately NOT an upsert, so a typo in an employee ID cannot quietly
+ * add someone to a company.
+ */
+export async function setCompanyRole(
+  employeeId: string,
+  companyId: string,
+  companyRole: CompanyRole
+): Promise<boolean> {
+  return withRetry(async () => {
+    const affected = await execute(
+      `UPDATE user_companies SET company_role = $1, updated_at = NOW()
+        WHERE employee_id = $2 AND company_id = $3`,
+      [companyRole, employeeId, companyId]
+    )
+    return affected > 0
+  })
+}
+
+/** How many company_admins a company has. Used to refuse removing the last one. */
+export async function countCompanyAdmins(companyId: string): Promise<number> {
+  return withRetry(async () => {
+    const row = await queryOne<{ n: number }>(
+      `SELECT count(*)::int AS n FROM user_companies
+        WHERE company_id = $1 AND company_role = 'company_admin'`,
+      [companyId]
+    )
+    return row?.n ?? 0
+  })
+}
+
 export async function addUserToCompany(
   employeeId: string,
   companyId: string,
