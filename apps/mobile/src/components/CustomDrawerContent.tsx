@@ -8,6 +8,7 @@ import { AuthContext } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { DebugMenu } from './DebugMenu'
 import { hasTabAccess } from '../utils/permissions'
+import { getMyCompanies } from '../services/companyService'
 
 interface NavigationItem {
   screen: string
@@ -30,6 +31,12 @@ export default function CustomDrawerContent({ visible, onClose, isFounder = fals
   const [expandedAdmin, setExpandedAdmin] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [debugMenuVisible, setDebugMenuVisible] = useState(false)
+  /**
+   * The company this session is acting in. The switcher lived on the Settings
+   * screen only, so everywhere else in the app there was no way to tell which
+   * company's data you were looking at.
+   */
+  const [activeCompany, setActiveCompany] = useState<string | null>(null)
   const { colors } = useTheme()
   const styles = getStyles(colors)
 
@@ -45,6 +52,22 @@ export default function CustomDrawerContent({ visible, onClose, isFounder = fals
       const userData = await getUserData()
       if (userData) {
         setCurrentUser(userData)
+      }
+
+      // Only shown when there is more than one company to be in: for the single-
+      // company case it would be noise.
+      try {
+        const companies = await getMyCompanies()
+        if (companies.length > 1) {
+          const active =
+            companies.find((c) => c.companyId === (userData as { companyId?: string } | null)?.companyId) ||
+            companies.find((c) => c.isDefault)
+          setActiveCompany(active?.name ?? null)
+        } else {
+          setActiveCompany(null)
+        }
+      } catch {
+        setActiveCompany(null)
       }
     } catch (error) {
       console.error('Failed to load user data:', error)
@@ -219,6 +242,11 @@ export default function CustomDrawerContent({ visible, onClose, isFounder = fals
               <Text style={styles.userName}>{currentUser?.name || 'Loading...'}</Text>
               <Text style={styles.userRole}>{currentUser ? getRoleDisplayName(currentUser.role) : ''}</Text>
               <Text style={styles.userEmployeeId}>{currentUser?.employeeId || ''}</Text>
+              {activeCompany && (
+                <View style={styles.companyChip}>
+                  <Text style={styles.companyChipText}>{activeCompany}</Text>
+                </View>
+              )}
             </View>
 
             <Divider style={styles.divider} />
@@ -422,6 +450,18 @@ const getStyles = (colors: any) => StyleSheet.create({
     ...materialTypography.bodySmall,
     color: colors.textTertiary,
     marginTop: materialSpacing.xs,
+  },
+  companyChip: {
+    marginTop: materialSpacing.sm,
+    paddingHorizontal: materialSpacing.sm,
+    paddingVertical: 2,
+    borderRadius: 10,
+    backgroundColor: colors.primaryLight,
+  },
+  companyChipText: {
+    ...materialTypography.bodySmall,
+    color: colors.primaryDark || colors.primary,
+    fontWeight: '600',
   },
   divider: {
     backgroundColor: colors.border,

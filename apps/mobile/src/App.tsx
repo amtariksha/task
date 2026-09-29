@@ -54,6 +54,7 @@ import { LOGIN_MUTATION, REGISTER_PUSH_TOKEN, UNREGISTER_PUSH_TOKEN, GET_FEED_PO
 import { ThemeProvider, useTheme, lightColors, darkColors, DrawerProvider, useDrawer } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import { ProjectFilterProvider, useProjectFilter } from './contexts/ProjectFilterContext'
+import { notificationTarget } from './utils/notificationRouting'
 import { registerForPushNotifications, setupNotificationListeners, cancelAllNotifications, setBadgeCount } from './services/pushNotificationService'
 import Constants from 'expo-constants'
 import * as Application from 'expo-application'
@@ -719,7 +720,13 @@ function AppContent() {
     return () => setOnUnauthorized(() => {})
   }, [])
 
-  // Helper function to handle notification navigation
+  /**
+   * Open whatever a tapped push refers to.
+   *
+   * The mapping moved to utils/notificationRouting so the in-app notification
+   * list can use the same one — tapping a row there used to mark it read and
+   * leave you where you were.
+   */
   const handleNotificationNavigation = (data: any) => {
     if (!navigationRef.current) {
       console.warn('Navigation ref not ready')
@@ -727,53 +734,9 @@ function AppContent() {
     }
     notificationNavAtRef.current = Date.now()
 
-    if (data?.screen === 'FounderStart') {
-      try {
-        navigationRef.current.navigate((isFounderRef.current ? 'FounderStart' : 'Notifications') as any)
-      } catch (error) {
-        console.error('Navigation error:', error)
-      }
-      return
-    }
-
-    const { type, taskId, bugId, leaveId, wfhId, postId } = data
-
+    const target = notificationTarget(data || {}, { isFounder: isFounderRef.current })
     try {
-      switch (type) {
-        case 'task':
-          if (taskId) {
-            navigationRef.current.navigate('TaskDetails' as any, { taskId })
-          }
-          break
-        case 'bug':
-          if (bugId) {
-            navigationRef.current.navigate('BugDetails' as any, { bugId })
-          }
-          break
-        case 'leave':
-          if (leaveId) {
-            navigationRef.current.navigate('LeaveDetails' as any, { leaveId })
-          }
-          break
-        case 'wfh':
-          if (wfhId) {
-            navigationRef.current.navigate('WFHDetails' as any, { wfhId })
-          }
-          break
-        case 'feed':
-        case 'mention':
-        case 'comment':
-        case 'reaction':
-          if (postId) {
-            navigationRef.current.navigate('FeedPostDetails' as any, { postId })
-          } else {
-            navigationRef.current.navigate('FeedTab' as any)
-          }
-          break
-        default:
-          // Navigate to notifications screen if type is unknown
-          navigationRef.current.navigate('Notifications' as any)
-      }
+      navigationRef.current.navigate(target.screen as any, target.params as any)
     } catch (error) {
       console.error('Navigation error:', error)
     }
@@ -814,7 +777,10 @@ function AppContent() {
             }
             setIsPinSetupNeeded(false)
           } else {
-            setIsPinSetupNeeded(true)
+            // The app-lock PIN is OPT-IN, set up from Settings. It used to be
+            // forced on every sign-in with no way to decline, which is the same
+            // complaint the web app had.
+            setIsPinSetupNeeded(false)
             setIsAppLocked(false)
           }
           // Before RESTORE_TOKEN so the first logged-in render already has the right root route.
@@ -961,7 +927,8 @@ function AppContent() {
               setIsAppLocked(true) // Lock the app so they have to enter the PIN
               setIsPinSetupNeeded(false)
             } else {
-              setIsPinSetupNeeded(true)
+              // Opt-in: no PIN set means straight into the app.
+              setIsPinSetupNeeded(false)
               setIsAppLocked(false)
             }
 
@@ -1017,7 +984,8 @@ function AppContent() {
             setIsAppLocked(true)
             setIsPinSetupNeeded(false)
           } else {
-            setIsPinSetupNeeded(true)
+            // Opt-in: no PIN set means straight into the app.
+            setIsPinSetupNeeded(false)
             setIsAppLocked(false)
           }
 

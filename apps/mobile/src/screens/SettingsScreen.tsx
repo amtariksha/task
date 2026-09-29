@@ -31,7 +31,7 @@ import Constants from 'expo-constants'
 import { AuthContext } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { materialColors, materialTypography, materialSpacing } from '../config/materialTheme'
-import { getUserData, saveUserData as setUserData, getSecure, saveSecure, SECURE_KEYS, getCurrentUserPin, saveUserPin } from '../utils/secureStorage'
+import { getUserData, saveUserData as setUserData, getSecure, saveSecure, SECURE_KEYS, getCurrentUserPin, saveUserPin, deleteUserPin } from '../utils/secureStorage'
 import apiClient from '../services/apiClient'
 import { getAllSettings, GroupedSettings } from '../services/settingsService'
 import {
@@ -126,6 +126,12 @@ export default function SettingsScreen() {
 
   // Change PIN Flow States
   const [changePinVisible, setChangePinVisible] = useState(false)
+  /**
+   * Whether this user has a PIN at all. The app used to force PIN setup at every
+   * sign-in with no way to decline; it is opt-in now, so Settings has to offer
+   * "Set up", "Change" and "Turn off" rather than only "Change".
+   */
+  const [hasPin, setHasPin] = useState(false)
   const [changePinStep, setChangePinStep] = useState<'verify' | 'new' | 'confirm'>('verify')
   const [currentPinInput, setCurrentPinInput] = useState('')
   const [newPinInput, setNewPinInput] = useState('')
@@ -133,6 +139,8 @@ export default function SettingsScreen() {
   const [changePinError, setChangePinError] = useState('')
 
   const loadProfileData = useCallback(async () => {
+    // Decides whether Settings offers 'Set up' or 'Change'/'Turn off'.
+    getCurrentUserPin().then((pin) => setHasPin(Boolean(pin))).catch(() => setHasPin(false))
     try {
       // 1. Get User Data
       const userData = await getUserData()
@@ -393,6 +401,51 @@ export default function SettingsScreen() {
     }
   }
 
+  /** Set up a PIN for the first time: nothing to verify, so start at 'new'. */
+  const handleOpenSetPin = () => {
+    setChangePinStep('new')
+    setCurrentPinInput('')
+    setNewPinInput('')
+    setConfirmPinInput('')
+    setChangePinError('')
+    setChangePinVisible(true)
+  }
+
+  /**
+   * Turn the app lock off. Verifying the current PIN first is the point: otherwise
+   * anyone holding an unlocked phone could remove the lock that protects it.
+   */
+  const handleRemovePin = () => {
+    Alert.alert(
+      'Turn off the security PIN?',
+      'The app will open without asking for a PIN. You can set a new one at any time.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Turn off',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                const employeeId = (await getUserData<{ employeeId?: string }>())?.employeeId
+                if (!employeeId) {
+                  Alert.alert('Error', 'Could not identify the signed-in user')
+                  return
+                }
+                await deleteUserPin(employeeId)
+                setHasPin(false)
+                Alert.alert('Done', 'The security PIN has been turned off.')
+              } catch (err) {
+                console.error('Failed to remove the PIN:', err)
+                Alert.alert('Error', 'Could not turn off the PIN. Please try again.')
+              }
+            })()
+          },
+        },
+      ]
+    )
+  }
+
   const handleOpenChangePin = () => {
     setChangePinStep('verify')
     setCurrentPinInput('')
@@ -427,7 +480,8 @@ export default function SettingsScreen() {
         }
         // Per-user key: a device-wide PIN locked the next person to sign in.
         await saveUserPin(employeeId, newPinInput)
-        Alert.alert('Success', 'Security PIN changed successfully')
+        setHasPin(true)
+        Alert.alert('Success', hasPin ? 'Security PIN changed successfully' : 'Security PIN set')
         setChangePinVisible(false)
       } else {
         setChangePinError('PINs do not match')
@@ -741,14 +795,30 @@ export default function SettingsScreen() {
                 <Switch value={isDark} onValueChange={toggleTheme} color={colors.primary} />
               </View>
 
-              <TouchableOpacity
-                style={styles.settingRow}
-                onPress={handleOpenChangePin}
-                activeOpacity={0.6}
-              >
-                <Text style={styles.settingLabel}>Security PIN</Text>
-                <Button mode="text" labelStyle={{ color: colors.primary }}>Change PIN</Button>
-              </TouchableOpacity>
+              <View style={styles.settingRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.settingLabel}>Security PIN</Text>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                    {hasPin
+                      ? 'The app asks for this PIN after 5 minutes in the background.'
+                      : 'Off. Turn it on to lock the app when you leave it.'}
+                  </Text>
+                </View>
+                {hasPin ? (
+                  <View style={{ flexDirection: 'row' }}>
+                    <Button mode="text" onPress={handleOpenChangePin} labelStyle={{ color: colors.primary }}>
+                      Change
+                    </Button>
+                    <Button mode="text" onPress={handleRemovePin} labelStyle={{ color: colors.error }}>
+                      Turn off
+                    </Button>
+                  </View>
+                ) : (
+                  <Button mode="text" onPress={handleOpenSetPin} labelStyle={{ color: colors.primary }}>
+                    Set up
+                  </Button>
+                )}
+              </View>
 
               {biometricSupported && biometricEnrolled && (
                 <View style={styles.settingRow}>

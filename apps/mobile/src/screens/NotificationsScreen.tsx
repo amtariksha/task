@@ -22,6 +22,8 @@ import {
   ActivityIndicator,
 } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import { notificationTarget } from '../utils/notificationRouting'
+import { getCachedFounderFlag } from '../services/founderFlagService'
 import { StackNavigationProp } from '@react-navigation/stack';
 import { RootStackParamList } from '../navigation/types';
 import { useQuery, useMutation } from '@apollo/client/react'
@@ -58,6 +60,9 @@ interface Notification {
 
 export default function NotificationsScreen() {
   const navigation = useNavigation<any>()
+  // FounderStart is only registered in the navigator for a founder, so a
+  // founder_start notification must not try to open it for anyone else.
+  const [isFounder, setIsFounder] = useState(false)
   const { colors } = useTheme()
   const responsive = useResponsive()
   const styles = useMemo(() => getStyles(colors, responsive), [colors, responsive])
@@ -69,6 +74,7 @@ export default function NotificationsScreen() {
         setUserId(user.employeeId)
       }
     })
+    getCachedFounderFlag().then(setIsFounder).catch(() => setIsFounder(false))
   }, [])
 
   // GraphQL queries and mutations
@@ -124,7 +130,17 @@ export default function NotificationsScreen() {
         console.error('Failed to mark as read:', error)
       }
     }
-  }, [markAsRead, refetch])
+
+    // Tapping a row used to do nothing but mark it read, while the same
+    // notification arriving as a push opened the item. Same mapping for both now.
+    const target = notificationTarget(notification, { isFounder })
+    if (target.screen === 'Notifications') return // already here
+    try {
+      navigation.navigate(target.screen, target.params)
+    } catch (error) {
+      console.error('Could not open this notification:', error)
+    }
+  }, [markAsRead, refetch, navigation, isFounder])
 
   const handleMarkAllAsRead = useCallback(async () => {
     try {
