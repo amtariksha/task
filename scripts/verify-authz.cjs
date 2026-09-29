@@ -147,11 +147,14 @@ async function req(path, actor, init = {}) {
   {
     const member = await req('/api/projects?type=main', 'projectMember')
     const outsider = await req('/api/projects?type=main', 'outsider')
-    // AM-0017 is a member of exactly one project (PRJ-037).
     check('a project member sees their projects', member.status === 200 && Array.isArray(member.body), 'got ' + member.status)
-    check('a user sees only the projects they are assigned to',
-      outsider.status === 200 && Array.isArray(outsider.body) && outsider.body.length === 1 &&
-        outsider.body[0].projectId === 'PRJ-037',
+    // AM-0017 is a member of exactly one project, PRJ-037 — which the company
+    // split moved to COMP-002. Their session is in COMP-001 and they are not a
+    // member of COMP-002, so they correctly see nothing: assignment alone is not
+    // enough once the project belongs to another company. Adding them to COMP-002
+    // on the Company page brings PRJ-037 back.
+    check('a project in another company is not visible on assignment alone',
+      outsider.status === 200 && Array.isArray(outsider.body) && outsider.body.length === 0,
       'got ' + outsider.status + ' ' + JSON.stringify((outsider.body || []).map(p => p.projectId)))
     const wrongCompany = await req('/api/projects?type=main', 'otherCompany')
     check('a session in another company sees none of these projects',
