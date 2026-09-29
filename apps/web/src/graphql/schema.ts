@@ -20,6 +20,9 @@ export const typeDefs = `#graphql
     bugs: [Bug!]!
     tabPermissions: [String!]
     isFounder: Boolean!
+    """Company this session is acting in (migration 062)."""
+    companyId: String
+    isPlatformAdmin: Boolean
   }
 
   type Task {

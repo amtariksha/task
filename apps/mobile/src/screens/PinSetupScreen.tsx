@@ -12,7 +12,7 @@ import {
 import { Text, Button, Portal, Dialog } from 'react-native-paper'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useTheme } from '../contexts/ThemeContext'
-import { saveSecure, SECURE_KEYS } from '../utils/secureStorage'
+import { saveSecure, SECURE_KEYS, saveUserPin, getUserData } from '../utils/secureStorage'
 import {
   isBiometricSupported,
   isBiometricEnrolled,
@@ -112,7 +112,13 @@ export default function PinSetupScreen({ onComplete }: PinSetupScreenProps) {
   const handleSuccess = async (finalPin: string) => {
     try {
       Keyboard.dismiss()
-      await saveSecure(SECURE_KEYS.USER_PIN, finalPin)
+      const employeeId = (await getUserData<{ employeeId?: string }>())?.employeeId
+      if (!employeeId) {
+        setError('Could not identify the signed-in user. Please sign in again.')
+        return
+      }
+      // Per-user key: a device-wide PIN locked the next person to sign in.
+      await saveUserPin(employeeId, finalPin)
       if (biometricAvailable) {
         setShowBiometricDialog(true)
       } else {

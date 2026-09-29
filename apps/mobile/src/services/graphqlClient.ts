@@ -3,14 +3,27 @@
  * Centralized GraphQL client with REST fallback for the mobile app
  */
 
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import { buildApiUrl } from '../config/api'
 import { ApiResponse } from './apiClient'
-import { getUserToken } from '../utils/secureStorage'
+import { getUserToken, deleteSecure, SECURE_KEYS } from '../utils/secureStorage'
+import { triggerUnauthorized } from '../utils/authEvents'
 
 export interface GraphQLResponse<T = any> {
   data?: T
   errors?: Array<{ message: string }>
 }
+
+/**
+ * GraphQL reports authorization failures in the body with HTTP 200, so the
+ * status-code handling in apiClient never saw them. An expired token therefore
+ * left the app signed in, failing every query until the user restarted it.
+ */
+export const isUnauthenticatedError = (message: string): boolean =>
+  /UNAUTHENTICATED|must be signed in|Unauthorized/i.test(message)
+
+export const isForbiddenError = (message: string): boolean =>
+  /FORBIDDEN|do not have permission|not authorized/i.test(message)
 
 /**
  * Execute GraphQL query or mutation
@@ -46,7 +59,15 @@ export const executeGraphQLQuery = async <T = any>(
     
     // Check for GraphQL errors
     if (result.errors && result.errors.length > 0) {
-      throw new Error(result.errors[0].message || 'GraphQL query failed')
+      const message = result.errors[0].message || 'GraphQL query failed'
+      if (response.status === 401 || isUnauthenticatedError(message)) {
+        // Same treatment a 401 gets in apiClient: drop the token and let the app
+        // return to the sign-in screen.
+        await deleteSecure(SECURE_KEYS.USER_TOKEN)
+        await AsyncStorage.removeItem('userToken')
+        triggerUnauthorized()
+      }
+      throw new Error(message)
     }
     
     if (!result.data) {
@@ -86,6 +107,15 @@ export const executeGraphQLWithFallback = async <T = any>(
     }
   } catch (graphqlError) {
     const errorMessage = graphqlError instanceof Error ? graphqlError.message : String(graphqlError)
+
+    // An authorization failure is an answer, not a transport problem. Retrying
+    // over REST just earns the same 403 and replaces the server's explanation
+    // with a generic one.
+    if (isUnauthenticatedError(errorMessage) || isForbiddenError(errorMessage)) {
+      console.warn(`⛔ [${componentName}] GraphQL refused the request:`, errorMessage)
+      return { success: false, error: errorMessage }
+    }
+
     console.warn(`⚠️ [${componentName}] GraphQL failed, falling back to REST:`, errorMessage)
     
     // Fallback to REST API

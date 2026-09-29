@@ -22,9 +22,14 @@
  * all. Route handlers should call these helpers rather than re-deriving rules.
  */
 
-import { getCompanyRole, isPlatformAdmin as dbIsPlatformAdmin, type CompanyRole } from './db/companies'
+import {
+  getCompanyRole,
+  getCompanyMemberIds,
+  isPlatformAdmin as dbIsPlatformAdmin,
+  type CompanyRole,
+} from './db/companies'
 import { getProjectRole, isUserAssignedToProject, type ProjectRole } from './db/project-users'
-import { isInManagerChain } from './db/users'
+import { isInManagerChain, getVisibleEmployeeIds } from './db/users'
 import { getProjectById } from './db/projects'
 
 export interface Actor {
@@ -97,9 +102,16 @@ export async function canManageUsers(actor: Actor, companyId: string): Promise<b
   return canAdminCompany(actor, companyId)
 }
 
-/** May the actor create, edit or archive this project? */
+/**
+ * May the actor create, edit or archive this project?
+ *
+ * Looks the project up INCLUDING soft-deleted rows: restoring a deleted project
+ * is a management action, and with the default lookup the project came back null
+ * so `/api/projects/[projectId]/restore` returned 403 to everyone, platform
+ * admins included.
+ */
 export async function canManageProject(actor: Actor, projectId: string): Promise<boolean> {
-  const project = await getProjectById(projectId)
+  const project = await getProjectById(projectId, true)
   if (!project) return false
 
   const companyId = (project as { companyId?: string }).companyId
@@ -191,6 +203,35 @@ export async function canViewWorkItem(
   if (options.ownerEmployeeId === actor.employeeId) return true
   if (options.projectId && (await isUserAssignedToProject(options.projectId, actor.employeeId))) return true
   return canEditWorkItem(actor, options)
+}
+
+/**
+ * Which employees may the actor see? The set form of `canViewUser`, for list
+ * endpoints that would otherwise need one authorization query per row.
+ *
+ * `{ all: true }` means no filter applies — a platform admin, or a legacy global
+ * admin on a token issued before migration 062 (the same fail-open case
+ * `isSameCompany` allows, so behaviour does not change mid-rollout).
+ */
+export type VisibleEmployeeScope =
+  | { all: true }
+  | { all: false; employeeIds: string[] }
+
+export async function getVisibleEmployeeScope(actor: Actor): Promise<VisibleEmployeeScope> {
+  if (await isPlatformAdmin(actor)) return { all: true }
+  if (!actor.companyId && hasLegacyAdminRole(actor)) return { all: true }
+
+  // Themselves plus everyone below them in the reporting chain, at any depth.
+  const employeeIds = new Set(await getVisibleEmployeeIds(actor.employeeId))
+
+  // A company admin sees their whole company, not only their reports.
+  if (actor.companyId && (await canAdminCompany(actor, actor.companyId))) {
+    for (const employeeId of await getCompanyMemberIds(actor.companyId)) {
+      employeeIds.add(employeeId)
+    }
+  }
+
+  return { all: false, employeeIds: Array.from(employeeIds) }
 }
 
 /** May the actor approve leave / WFH / attendance for this employee? */

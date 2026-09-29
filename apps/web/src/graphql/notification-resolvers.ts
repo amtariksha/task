@@ -10,8 +10,27 @@
 
 import DataLoader from 'dataloader'
 import { getPool } from '@/lib/db'
+import { isPlatformAdmin } from '@/lib/authz'
+import { getDefaultCompanyId, isMemberOfCompany } from '@/lib/db/companies'
+import {
+  assertCanAccessNotificationsOf,
+  requireNotificationActor,
+  resolveNotificationRecipient,
+  type NotificationAccessDeps,
+  type NotificationActor,
+} from '@/lib/notifications/notification-access'
 
 const getPoolInstance = () => getPool()
+
+const accessDeps: NotificationAccessDeps = { isPlatformAdmin, getDefaultCompanyId, isMemberOfCompany }
+
+/** The notification row, or null when it does not exist; FORBIDDEN when it is not the actor's to see. */
+async function loadAccessibleNotification(actor: NotificationActor, context: any, notificationId: string) {
+  const notification = await context.loaders.notificationLoader.load(notificationId)
+  if (!notification) return null
+  await assertCanAccessNotificationsOf(actor, notification.user_id, accessDeps)
+  return notification
+}
 
 // DataLoader for batching notification queries
 export const createNotificationLoader = () => new DataLoader(async (notificationIds: readonly string[]) => {
@@ -34,21 +53,13 @@ export const notificationQueries = {
     limit?: number
     offset?: number
   }, context: any) => {
-    const authUserId = context?.user?.employeeId
-    if (!authUserId) throw new Error('UNAUTHENTICATED: You must be signed in.')
+    const actor = requireNotificationActor(context)
     const { userId: requestedUserId, isRead, notificationType, limit = 50, offset = 0 } = args
-    // Non-admins may only read their own notifications
-    const userId = context.user.role === 'admin' ? (requestedUserId || authUserId) : authUserId
+    const userId = await resolveNotificationRecipient(actor, requestedUserId, accessDeps)
 
-    let query = 'SELECT * FROM feed_notifications WHERE deleted_at IS NULL'
-    const params: any[] = []
-    let paramIndex = 1
-
-    if (userId) {
-      query += ` AND user_id = $${paramIndex}`
-      params.push(userId)
-      paramIndex++
-    }
+    let query = 'SELECT * FROM feed_notifications WHERE deleted_at IS NULL AND user_id = $1'
+    const params: any[] = [userId]
+    let paramIndex = 2
 
     if (isRead !== undefined) {
       query += ` AND is_read = $${paramIndex}`
@@ -70,15 +81,15 @@ export const notificationQueries = {
   },
 
   // Get single notification by ID
-  feedNotification: async (_: any, { notificationId }: { notificationId: string }, { loaders }: any) => {
-    return await loaders.notificationLoader.load(notificationId)
+  feedNotification: async (_: any, { notificationId }: { notificationId: string }, context: any) => {
+    const actor = requireNotificationActor(context)
+    return loadAccessibleNotification(actor, context, notificationId)
   },
 
   // Get unread notification count for a user
   unreadNotificationCount: async (_: any, { userId }: { userId: string }, context: any) => {
-    const authUserId = context?.user?.employeeId
-    if (!authUserId) throw new Error('UNAUTHENTICATED: You must be signed in.')
-    const scopedUserId = context.user.role === 'admin' ? (userId || authUserId) : authUserId
+    const actor = requireNotificationActor(context)
+    const scopedUserId = await resolveNotificationRecipient(actor, userId, accessDeps)
     const result = await getPoolInstance().query(
       'SELECT COUNT(*) as count FROM feed_notifications WHERE user_id = $1 AND is_read = false AND deleted_at IS NULL',
       [scopedUserId]
@@ -90,13 +101,20 @@ export const notificationQueries = {
 // Mutation resolvers
 export const notificationMutations = {
   // Mark a notification as read
-  markNotificationAsRead: async (_: any, { notificationId }: { notificationId: string }) => {
+  markNotificationAsRead: async (_: any, { notificationId }: { notificationId: string }, context: any) => {
+    const actor = requireNotificationActor(context)
+    const notification = await loadAccessibleNotification(actor, context, notificationId)
+    if (!notification) {
+      throw new Error(`Notification ${notificationId} not found`)
+    }
+
+    // user_id repeats the checked owner so the update cannot touch any other row.
     const result = await getPoolInstance().query(
-      `UPDATE feed_notifications 
-       SET is_read = true, read_at = CURRENT_TIMESTAMP 
-       WHERE notification_id = $1 AND deleted_at IS NULL
+      `UPDATE feed_notifications
+       SET is_read = true, read_at = CURRENT_TIMESTAMP
+       WHERE notification_id = $1 AND user_id = $2 AND deleted_at IS NULL
        RETURNING *`,
-      [notificationId]
+      [notificationId, notification.user_id]
     )
 
     if (result.rows.length === 0) {
@@ -108,9 +126,8 @@ export const notificationMutations = {
 
   // Mark all notifications as read for a user
   markAllNotificationsAsRead: async (_: any, { userId }: { userId: string }, context: any) => {
-    const authUserId = context?.user?.employeeId
-    if (!authUserId) throw new Error('UNAUTHENTICATED: You must be signed in.')
-    const scopedUserId = context.user.role === 'admin' ? (userId || authUserId) : authUserId
+    const actor = requireNotificationActor(context)
+    const scopedUserId = await resolveNotificationRecipient(actor, userId, accessDeps)
     await getPoolInstance().query(
       `UPDATE feed_notifications
        SET is_read = true, read_at = CURRENT_TIMESTAMP
@@ -121,13 +138,17 @@ export const notificationMutations = {
   },
 
   // Delete a notification (soft delete)
-  deleteNotification: async (_: any, { notificationId }: { notificationId: string }, { user }: any) => {
+  deleteNotification: async (_: any, { notificationId }: { notificationId: string }, context: any) => {
+    const actor = requireNotificationActor(context)
+    const notification = await loadAccessibleNotification(actor, context, notificationId)
+    if (!notification) return false
+
     const result = await getPoolInstance().query(
-      `UPDATE feed_notifications 
-       SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $2 
-       WHERE notification_id = $1 AND deleted_at IS NULL
+      `UPDATE feed_notifications
+       SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $2
+       WHERE notification_id = $1 AND user_id = $3 AND deleted_at IS NULL
        RETURNING *`,
-      [notificationId, user?.employeeId || 'system']
+      [notificationId, actor.employeeId, notification.user_id]
     )
 
     return result.rows.length > 0

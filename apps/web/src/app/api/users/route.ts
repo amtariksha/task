@@ -39,8 +39,10 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now()
     })
 
-    // Add caching headers for better performance
-    response.headers.set('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60')
+    // NEVER a shared cache: this response is scoped to the caller's company, so
+    // `public, s-maxage=30` let a CDN or proxy hand one tenant's names and email
+    // addresses to the next caller.
+    response.headers.set('Cache-Control', 'private, no-store')
 
     return response
   } catch (error) {
@@ -54,8 +56,7 @@ export async function GET(request: NextRequest) {
       timestamp: Date.now()
     }, { status: 500 })
 
-    // Shorter cache for error responses
-    response.headers.set('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30')
+    response.headers.set('Cache-Control', 'private, no-store')
 
     return response
   }

@@ -20,6 +20,7 @@ import { materialColors, materialTypography, materialSpacing } from '../config/m
 import { useNetworkStatus } from '../hooks/useNetworkStatus'
 import { formatDateIST } from '../utils/datetime'
 import apiClient from '../services/apiClient'
+import { APPROVER_ROLES } from '../utils/permissions'
 
 interface LeaveApplication {
   id: string
@@ -97,12 +98,14 @@ export default function LeaveDetailsScreen() {
 
   const canApprove = useCallback(() => {
     if (!currentUser || !leave) return false
-    const approverRoles = ['top_management', 'management', 'amtarikshian']
-    return (
-      approverRoles.includes(currentUser.role) &&
-      leave.status === 'Pending' &&
-      leave.employeeId !== currentUser.employeeId
-    )
+    if (leave.status !== 'Pending') return false
+    // Never your own application — the server refuses it too (authz.canApproveFor).
+    if (leave.employeeId === currentUser.employeeId) return false
+    // 'amtarikshian' is the plain employee role, so this used to offer Approve to
+    // everyone while leaving it off for admins. The applicant's own manager may
+    // approve whatever their global role is; the server has the final say.
+    if (leave.managerId && leave.managerId === currentUser.employeeId) return true
+    return APPROVER_ROLES.includes(currentUser.role)
   }, [currentUser, leave])
 
   const canDelete = useCallback(() => {
@@ -124,7 +127,6 @@ export default function LeaveDetailsScreen() {
               const result = await apiClient.post(
                 `/api/leaves/${leaveId}/approve`,
                 {
-                  approverId: currentUser.employeeId,
                   remarks: remarks || null,
                 }
               )
@@ -166,7 +168,6 @@ export default function LeaveDetailsScreen() {
               const result = await apiClient.post(
                 `/api/leaves/${leaveId}/reject`,
                 {
-                  approverId: currentUser.employeeId,
                   remarks: remarks,
                   reason: remarks,
                 }

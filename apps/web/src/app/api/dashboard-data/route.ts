@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withTimeout } from '@/lib/db/config'
 import { getTasksByEmployeeId, getAllTasks } from '@/lib/db/tasks'
 import { getBugsByEmployeeId, getAllBugs } from '@/lib/db/bugs'
-import { getUsersByEmployeeIds, getAllUsers } from '@/lib/db/users'
+import { getUsersByEmployeeIds, getAllUsers, getUsersByCompany } from '@/lib/db/users'
 import { getDropdownSettings } from '@/lib/db/settings'
 import { getSubTasksByAssignedTo } from '@/lib/db/taskChecklists'
 import { getBugSubTasksByAssignedTo } from '@/lib/db/bugSubtasks'
@@ -36,7 +36,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const includeUsers = sp.get('includeUsers') === 'true' || ['admin', 'top_management'].includes(role)
+    // `includeUsers` is client-controlled, and it used to be OR-ed with the role
+    // check — so ANY signed-in user could pass ?includeUsers=true and receive
+    // getAllUsers(), every employee of every company on the deployment, plus every
+    // company's tasks and bugs. The flag now only decides whether the user list is
+    // returned; WHICH users, and the unscoped work view, come from the session.
+    const includeUsers = sp.get('includeUsers') === 'true' || isAdminOrTopMgmt
+    const includeAllWork = isAdminOrTopMgmt
 
     // Load core data in parallel based on role
     let tasksPromise: Promise<any[]> | null = null
@@ -46,7 +52,17 @@ export async function GET(request: NextRequest) {
     let bugSubtasksPromise: Promise<any[]> | null = null
 
     if (includeUsers) {
-      usersPromise = withTimeout(getAllUsers(), 10000, 'Failed to fetch users')
+      // Company-scoped, exactly as /api/users is. Platform admins and pre-062
+      // tokens (no companyId claim) keep the deployment-wide view.
+      const companyId = authUser.companyId
+      usersPromise = withTimeout(
+        companyId && !authUser.isPlatformAdmin ? getUsersByCompany(companyId) : getAllUsers(),
+        10000,
+        'Failed to fetch users'
+      )
+    }
+
+    if (includeAllWork) {
       tasksPromise = withTimeout(getAllTasks(), 10000, 'Failed to fetch tasks')
       bugsPromise = withTimeout(getAllBugs(), 10000, 'Failed to fetch bugs')
     } else {
@@ -57,7 +73,11 @@ export async function GET(request: NextRequest) {
       bugSubtasksPromise = withTimeout(getBugSubTasksByAssignedTo(employeeId), 10000, 'Failed to fetch bug subtasks for user')
     }
 
-    const settingsPromise = withTimeout(getDropdownSettings(), 8000, 'Failed to fetch settings')
+    const settingsPromise = withTimeout(
+      getDropdownSettings(authUser.companyId ?? null),
+      8000,
+      'Failed to fetch settings'
+    )
 
     let [tasks, bugs, settings, users, subtasks, bugSubtasks] = await Promise.all([
       tasksPromise!,
@@ -143,7 +163,9 @@ export async function GET(request: NextRequest) {
     }
 
     const res = NextResponse.json(payload)
-    res.headers.set('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120')
+    // The payload is this employee's own tasks and bugs; a shared cache would
+    // serve it to whoever asked next.
+    res.headers.set('Cache-Control', 'private, max-age=60')
     return res
   } catch (error: any) {
     console.error('Error in GET /api/dashboard-data:', error)

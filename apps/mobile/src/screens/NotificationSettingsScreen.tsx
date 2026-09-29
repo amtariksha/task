@@ -90,7 +90,9 @@ export default function NotificationSettingsScreen() {
                 setPreferences(response.data)
                 setHasChanges(false)
             } else {
-                Alert.alert('Error', 'Failed to load preferences')
+                // The server's message says WHY — a 403 from the per-user access
+                // check reads very differently from a database timeout.
+                Alert.alert('Error', response.error || 'Failed to load preferences')
             }
         } catch (error) {
             console.error('Failed to load preferences:', error)
@@ -143,7 +145,7 @@ export default function NotificationSettingsScreen() {
                 setHasChanges(false)
                 Alert.alert('Success', 'Preferences saved successfully')
             } else {
-                Alert.alert('Error', 'Failed to save preferences')
+                Alert.alert('Error', response.error || 'Failed to save preferences')
             }
         } catch (error) {
             console.error('Failed to save preferences:', error)
@@ -176,9 +178,14 @@ export default function NotificationSettingsScreen() {
                                 setPreferences(response.data)
                                 setHasChanges(false)
                                 Alert.alert('Success', 'Preferences reset to defaults')
+                            } else {
+                                // There was no else branch, so a failed reset was
+                                // completely silent.
+                                Alert.alert('Error', response.error || 'Failed to reset preferences')
                             }
                         } catch (error) {
                             console.error('Failed to reset preferences:', error)
+                            Alert.alert('Error', 'Failed to reset preferences')
                         } finally {
                             setSaving(false)
                         }

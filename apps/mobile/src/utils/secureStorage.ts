@@ -17,8 +17,22 @@ export const SECURE_KEYS = {
   USER_TOKEN: 'userToken',
   USER_DATA: 'userData',
   BIOMETRIC_ENABLED: 'biometricEnabled',
-  USER_PIN: 'userPin',
 } as const
+
+/**
+ * The app-lock PIN is stored PER USER — `userPin:<employeeId>`.
+ *
+ * It used to live under one device-wide `userPin` key, so on a shared device the
+ * second person to sign in was locked behind the first person's PIN, and clearing
+ * it on logout was the only thing standing between them and each other's session.
+ * The web app was changed the same way (jsr_user_pin:<employeeId>).
+ */
+const USER_PIN_PREFIX = 'userPin'
+
+/** The pre-per-user key, in both stores. Read once to migrate, then discarded. */
+const LEGACY_DEVICE_PIN_KEY = 'userPin'
+
+const pinKeyFor = (employeeId: string) => `${USER_PIN_PREFIX}:${employeeId}`
 
 // Keys for regular storage (non-sensitive)
 export const STORAGE_KEYS = {
@@ -34,10 +48,6 @@ export const STORAGE_KEYS = {
 export async function saveSecure(key: string, value: string): Promise<void> {
   try {
     await SecureStore.setItemAsync(key, value)
-    // Fallback for PIN so it survives APK updates
-    if (key === SECURE_KEYS.USER_PIN) {
-      await save(key, value)
-    }
   } catch (error) {
     console.error(`Failed to save secure data for key ${key}:`, error)
     throw error
@@ -49,18 +59,7 @@ export async function saveSecure(key: string, value: string): Promise<void> {
  */
 export async function getSecure(key: string): Promise<string | null> {
   try {
-    let val = await SecureStore.getItemAsync(key)
-    
-    // Check fallback if secure store was wiped during an APK update
-    if (!val && key === SECURE_KEYS.USER_PIN) {
-      val = await get<string>(key)
-      if (val) {
-        // Restore to secure store
-        await SecureStore.setItemAsync(key, val)
-      }
-    }
-    
-    return val
+    return await SecureStore.getItemAsync(key)
   } catch (error) {
     console.error(`Failed to get secure data for key ${key}:`, error)
     return null
@@ -140,16 +139,63 @@ export async function clearAll(): Promise<void> {
  */
 export async function clearSecureData(): Promise<void> {
   try {
+    // The PIN is keyed per user and deliberately survives sign-out, so the same
+    // person is not asked to set it up again on their next sign-in. A different
+    // user on the same device gets their own key, so nobody inherits a lock.
     await Promise.all([
       deleteSecure(SECURE_KEYS.USER_TOKEN),
       deleteSecure(SECURE_KEYS.USER_DATA),
-      // Clear the app-lock PIN too, otherwise the next user on a shared device
-      // is locked out behind the previous user's PIN.
-      deleteSecure(SECURE_KEYS.USER_PIN),
     ])
   } catch (error) {
     console.error('Failed to clear secure data:', error)
     throw error
+  }
+}
+
+/** The app-lock PIN for one user, or null when they have not set one. */
+export async function getUserPin(employeeId: string): Promise<string | null> {
+  if (!employeeId) return null
+  return getSecure(pinKeyFor(employeeId))
+}
+
+/** Set (or replace) one user's app-lock PIN. */
+export async function saveUserPin(employeeId: string, pin: string): Promise<void> {
+  if (!employeeId) throw new Error('Cannot store a PIN without an employee ID')
+  return saveSecure(pinKeyFor(employeeId), pin)
+}
+
+/** Remove one user's app-lock PIN. */
+export async function deleteUserPin(employeeId: string): Promise<void> {
+  if (!employeeId) return
+  return deleteSecure(pinKeyFor(employeeId))
+}
+
+/**
+ * The PIN belonging to the signed-in user, resolved from the stored session so
+ * callers do not all have to thread an employee ID through.
+ */
+export async function getCurrentUserPin(): Promise<string | null> {
+  const user = await getUserData<{ employeeId?: string }>()
+  if (!user?.employeeId) return null
+  return getUserPin(user.employeeId)
+}
+
+/**
+ * Throw away any PIN left under the old device-wide key, including the plaintext
+ * AsyncStorage copy that used to be kept "so it survives APK updates". It is not
+ * migrated to a per-user key: there is no way to tell whose PIN it was, and the
+ * owner is asked to set one up again rather than a stranger inheriting their lock.
+ */
+export async function discardLegacyDevicePin(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(LEGACY_DEVICE_PIN_KEY)
+  } catch (error) {
+    console.warn('Could not clear the legacy device PIN from secure storage:', error)
+  }
+  try {
+    await AsyncStorage.removeItem(LEGACY_DEVICE_PIN_KEY)
+  } catch (error) {
+    console.warn('Could not clear the legacy device PIN from local storage:', error)
   }
 }
 

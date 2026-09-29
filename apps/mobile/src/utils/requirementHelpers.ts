@@ -3,9 +3,15 @@
  *
  * The web editor stores rich HTML (Tiptap). Mobile has no HTML renderer, so we
  * show sections as plain text and, when a section is edited on mobile, convert
- * the edited plain text back to simple, server-sanitizable HTML. Rich
- * formatting authored on the web is therefore viewed (not rendered) on mobile;
- * saving a section on mobile rewrites that section's HTML from the plain text.
+ * the edited plain text back to simple, server-sanitizable HTML.
+ *
+ * That round trip is LOSSY: anything beyond paragraphs and line breaks — lists,
+ * headings, bold, links, tables — cannot be reconstructed from the plain text, so
+ * saving a formatted section on mobile silently destroyed its formatting (and,
+ * because any save adds a revision, sent an Approved requirement back to In
+ * Review for nothing). hasRichFormatting() identifies those sections so the UI can
+ * show them read-only, and sectionContentUnchanged() lets a screen skip a save
+ * that would change nothing.
  */
 
 export const REQUIREMENT_STATUSES = [
@@ -127,6 +133,39 @@ export function plainTextToHtml(text: string): string {
   return paragraphs
     .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
     .join('')
+}
+
+/**
+ * Tags the plain-text round trip can reproduce. A section containing only these
+ * survives an edit on mobile unchanged; anything else does not.
+ */
+const LOSSLESS_TAGS = new Set(['p', 'br', 'div'])
+
+/**
+ * Does this section carry formatting that a mobile edit would destroy?
+ *
+ * Errs towards true: an unrecognised tag counts as formatting, because the cost of
+ * a false positive is "edit this on the web" and the cost of a false negative is
+ * silently flattening someone's document.
+ */
+export function hasRichFormatting(html: string): boolean {
+  if (!html) return false
+  const tagPattern = /<\s*\/?\s*([a-zA-Z][a-zA-Z0-9]*)\b[^>]*>/g
+  let match: RegExpExecArray | null
+  while ((match = tagPattern.exec(html)) !== null) {
+    if (!LOSSLESS_TAGS.has(match[1].toLowerCase())) return true
+  }
+  // A styled paragraph is still formatting we cannot rebuild.
+  return /<\s*(p|div)\b[^>]*(style|class)\s*=/i.test(html)
+}
+
+/**
+ * Would saving this plain text leave the stored HTML as it is? Used to skip a
+ * no-op save: every save writes a revision and returns an approved requirement to
+ * review, so saving an untouched section had real consequences.
+ */
+export function sectionContentUnchanged(storedHtml: string, editedText: string): boolean {
+  return plainTextToHtml(editedText) === plainTextToHtml(htmlToPlainText(storedHtml))
 }
 
 /** Short preview of a section's text for list/collapsed rows. */

@@ -38,6 +38,7 @@ import { formatDateTimeIST } from '../utils/datetime'
 import {
   getRequirements,
   getRequirementBaselines,
+  getRequirementEditAccess,
   createRequirement,
   createRequirementBaseline,
   Requirement,
@@ -77,6 +78,12 @@ export default function RequirementsListScreen() {
   const [subprojects, setSubprojects] = useState<SubprojectOption[]>([])
 
   const [loading, setLoading] = useState(true)
+  const [accessError, setAccessError] = useState('')
+  // Answered by the server (requirementEditAccess). Creating and freezing were
+  // offered to every project member, including viewers.
+  const [canEdit, setCanEdit] = useState(false)
+  /** Reviewers must be project members — the picker listed the whole company. */
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [refreshing, setRefreshing] = useState(false)
 
   // Controls
@@ -115,8 +122,30 @@ export default function RequirementsListScreen() {
       const bls = await getRequirementBaselines(projectId)
       setBaselines(bls)
 
+      setAccessError('')
+
       const usersRes = await getAllUsers()
       setUsers(usersRes.success ? (usersRes.data || []) : [])
+
+      // Fetched separately from the requirements: a failure in either must not
+      // take the other down with it.
+      setCanEdit(await getRequirementEditAccess(projectId))
+
+      // Reviewer/assignee candidates are the project's members, not every user in
+      // the company — a non-member cannot even open the requirement to review it.
+      try {
+        const membersRes = await apiClient.get(`/api/projects/${projectId}/users`)
+        const rows = membersRes?.success && Array.isArray(membersRes.data) ? membersRes.data : []
+        setProjectMembers(
+          rows.map((pu: any) => ({
+            employeeId: pu.employeeId,
+            name: pu.userName || pu.name || pu.employeeId,
+          })) as User[]
+        )
+      } catch (memberErr) {
+        console.error('Failed to load project members', memberErr)
+        setProjectMembers([])
+      }
 
       // Subprojects are non-fatal — leave [] on failure.
       try {
@@ -128,7 +157,16 @@ export default function RequirementsListScreen() {
       }
     } catch (err) {
       console.error('Failed to load requirements', err)
-      Alert.alert('Error', (err as any)?.message || 'Something went wrong')
+      const message = (err as any)?.message || 'Something went wrong'
+      // A non-member gets FORBIDDEN here. That is an answer, not a crash: show it
+      // on the screen instead of an alert over an empty list.
+      if (/FORBIDDEN|not a member/i.test(message)) {
+        setAccessError('You are not a member of this project, so its requirements are not visible to you.')
+        setRequirements([])
+      } else {
+        setAccessError('')
+        Alert.alert('Error', message)
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)
@@ -217,13 +255,15 @@ export default function RequirementsListScreen() {
     }
   }
 
-  const reviewerItems = useMemo(
-    () => [
+  const reviewerItems = useMemo(() => {
+    // Fall back to every user only if the member list could not be loaded, so the
+    // picker is never empty when the server is partly unavailable.
+    const candidates = projectMembers.length > 0 ? projectMembers : users
+    return [
       { label: '- None -', value: '' },
-      ...users.map((u) => ({ label: `${u.name} (${u.employeeId})`, value: u.employeeId })),
-    ],
-    [users]
-  )
+      ...candidates.map((u) => ({ label: `${u.name} (${u.employeeId})`, value: u.employeeId })),
+    ]
+  }, [projectMembers, users])
 
   const subprojectItems = useMemo(
     () => [
@@ -243,6 +283,17 @@ export default function RequirementsListScreen() {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    )
+  }
+
+  if (accessError) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.emptyText}>{accessError}</Text>
+        <Button mode="contained" onPress={() => navigation.goBack()} style={{ marginTop: 16 }}>
+          Go Back
+        </Button>
       </View>
     )
   }
@@ -343,22 +394,30 @@ export default function RequirementsListScreen() {
           </Card>
         )}
 
-        {/* Freeze current version */}
-        <View style={styles.freezeRow}>
-          <Button
-            mode="outlined"
-            icon="lock"
-            onPress={() => setFreezeOpen(true)}
-            style={styles.freezeBtn}
-          >
-            Freeze current version
-          </Button>
-        </View>
+        {/* Freeze current version — an edit, so writers only */}
+        {canEdit ? (
+          <View style={styles.freezeRow}>
+            <Button
+              mode="outlined"
+              icon="lock"
+              onPress={() => setFreezeOpen(true)}
+              style={styles.freezeBtn}
+            >
+              Freeze current version
+            </Button>
+          </View>
+        ) : null}
 
         {/* Requirements list */}
         <View style={styles.listWrap}>
           {filteredRequirements.length === 0 ? (
-            <Text style={styles.emptyText}>No requirements yet. Tap + to add one.</Text>
+            <Text style={styles.emptyText}>
+              {search.trim() || statusFilter !== 'All'
+                ? 'No requirements match this search or filter.'
+                : canEdit
+                  ? 'No requirements yet. Tap New Requirement to add one.'
+                  : 'No requirements yet.'}
+            </Text>
           ) : (
             filteredRequirements.map((r) => {
               const statusStyle = getRequirementStatusStyle(r.status)
@@ -395,16 +454,18 @@ export default function RequirementsListScreen() {
         </View>
 
         {/* New requirement */}
-        <View style={styles.newReqRow}>
-          <Button
-            mode="contained"
-            icon="plus"
-            onPress={() => setCreateOpen(true)}
-            style={styles.newReqBtn}
-          >
-            New Requirement
-          </Button>
-        </View>
+        {canEdit ? (
+          <View style={styles.newReqRow}>
+            <Button
+              mode="contained"
+              icon="plus"
+              onPress={() => setCreateOpen(true)}
+              style={styles.newReqBtn}
+            >
+              New Requirement
+            </Button>
+          </View>
+        ) : null}
       </ScrollView>
 
       <Portal>

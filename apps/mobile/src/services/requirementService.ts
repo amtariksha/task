@@ -249,6 +249,31 @@ export async function getSectionRevisions(sectionId: string): Promise<Requiremen
   return data.requirementSectionRevisions || []
 }
 
+/**
+ * May the signed-in user edit this project's requirements?
+ *
+ * The screens showed every edit control to every project member, so a viewer got a
+ * FORBIDDEN on each attempt. The server has answered this question since the
+ * module shipped (`requirementEditAccess`); nothing asked it.
+ *
+ * Denies on error: hiding a control the user does have is a smaller harm than
+ * offering one they do not.
+ */
+export async function getRequirementEditAccess(projectId: string): Promise<boolean> {
+  const query = `
+    query RequirementEditAccess($projectId: String!) {
+      requirementEditAccess(projectId: $projectId)
+    }
+  `
+  try {
+    const data = await executeGraphQLQuery<{ requirementEditAccess: boolean }>(query, { projectId })
+    return Boolean(data.requirementEditAccess)
+  } catch (error) {
+    console.warn('Could not resolve requirement edit access:', error)
+    return false
+  }
+}
+
 export async function getRequirementBaselines(projectId: string): Promise<RequirementBaseline[]> {
   const query = `
     query RequirementBaselines($projectId: String!) {

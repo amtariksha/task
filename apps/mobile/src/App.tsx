@@ -49,11 +49,11 @@ import { OfflineBanner } from './components/OfflineBanner'
 import { ActivityIndicator, View, LogBox, Text, ScrollView, TouchableOpacity, Image, StatusBar } from 'react-native'
 import { IconButton, Provider as PaperProvider } from 'react-native-paper'
 import { apolloClient, initializeApollo, persistor } from './config/apollo'
-import { getUserToken, saveUserToken, saveUserData, clearSecureData, getUserData, getSecure, SECURE_KEYS, save, get, remove } from './utils/secureStorage'
+import { getUserToken, saveUserToken, saveUserData, clearSecureData, getUserData, getSecure, getCurrentUserPin, discardLegacyDevicePin, SECURE_KEYS, save, get, remove } from './utils/secureStorage'
 import { LOGIN_MUTATION, REGISTER_PUSH_TOKEN, UNREGISTER_PUSH_TOKEN, GET_FEED_POSTS, GET_FEED_TOPICS } from './config/graphql-queries'
 import { ThemeProvider, useTheme, lightColors, darkColors, DrawerProvider, useDrawer } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
-import { ProjectFilterProvider } from './contexts/ProjectFilterContext'
+import { ProjectFilterProvider, useProjectFilter } from './contexts/ProjectFilterContext'
 import { registerForPushNotifications, setupNotificationListeners, cancelAllNotifications, setBadgeCount } from './services/pushNotificationService'
 import Constants from 'expo-constants'
 import * as Application from 'expo-application'
@@ -590,8 +590,16 @@ function AppContent() {
   )
 
   const { isDrawerOpen, openDrawer, closeDrawer } = useDrawer()
+  const { resetForCompanySwitch } = useProjectFilter()
   const [pushToken, setPushToken] = React.useState<string | null>(null)
   const navigationRef = useRef<NavigationContainerRef<any>>(null)
+
+  /**
+   * Bumped when the session is re-scoped to another company. It keys the
+   * navigator, so every screen unmounts and remounts and refetches for the new
+   * company instead of keeping the previous one's data on screen.
+   */
+  const [sessionEpoch, setSessionEpoch] = useState(0)
   
   // Security lock states
   const [isPinSetupNeeded, setIsPinSetupNeeded] = useState(false)
@@ -663,7 +671,7 @@ function AppContent() {
         console.log('App resumed from background: checking lock...')
         const token = await getUserToken()
         if (token) {
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             const lastActiveStr = await get('jsr_last_active_time')
             const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : 0
@@ -785,11 +793,15 @@ function AppContent() {
         // Initialize Apollo cache persistence
         await initializeApollo()
 
+        // One-off cleanup: a PIN stored under the old device-wide key would lock
+        // whoever signs in next, whoever set it.
+        await discardLegacyDevicePin()
+
         // Use SecureStore instead of AsyncStorage for token
         userToken = await getUserToken()
 
         if (userToken) {
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             const lastActiveStr = await get('jsr_last_active_time')
             const lastActiveTime = lastActiveStr ? parseInt(lastActiveStr, 10) : 0
@@ -944,7 +956,7 @@ function AppContent() {
             await saveUserData(user)
 
             // Check if PIN setup is required
-            const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+            const storedPin = await getCurrentUserPin()
             if (storedPin) {
               setIsAppLocked(true) // Lock the app so they have to enter the PIN
               setIsPinSetupNeeded(false)
@@ -1000,7 +1012,7 @@ function AppContent() {
           await saveUserToken(token)
           await saveUserData(user)
 
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             setIsAppLocked(true)
             setIsPinSetupNeeded(false)
@@ -1026,7 +1038,7 @@ function AppContent() {
             return { success: false, error: 'No stored session' }
           }
 
-          const storedPin = await getSecure(SECURE_KEYS.USER_PIN)
+          const storedPin = await getCurrentUserPin()
           if (storedPin) {
             setIsAppLocked(true)
             setIsPinSetupNeeded(false)
@@ -1111,8 +1123,37 @@ function AppContent() {
       signUp: async () => {
         // Not implemented yet
       },
+      /**
+       * The session token has already been replaced by companyService.switchCompany.
+       * This is the same cleanup signOut performs, minus the sign-out itself: the
+       * previous company's data must not survive the switch.
+       */
+      onCompanySwitched: async () => {
+        try {
+          // Saved project IDs belong to the previous company.
+          await resetForCompanySwitch()
+
+          // Cached query results are company-scoped; purge the persisted copy too,
+          // or they come back on the next launch.
+          await apolloClient.clearStore()
+          try {
+            await persistor.purge()
+          } catch (purgeError) {
+            console.error('Failed to purge persisted cache after company switch:', purgeError)
+          }
+
+          // Founder status is per company, and it decides the root route.
+          setIsFounder(await refreshFounderFlag())
+        } catch (error) {
+          console.error('Company switch cleanup failed:', error)
+        } finally {
+          // Remount the stack even if part of the cleanup failed — stale screens
+          // are worse than a reload.
+          setSessionEpoch((epoch) => epoch + 1)
+        }
+      },
     }),
-    [pushToken]
+    [pushToken, resetForCompanySwitch]
   )
 
   // Keep the 401 handler pointing at the latest signOut (with current pushToken).
@@ -1152,6 +1193,8 @@ function AppContent() {
               />
               <OfflineBanner />
               <Stack.Navigator
+                // Remounts every screen after a company switch (see onCompanySwitched).
+                key={sessionEpoch}
                 screenOptions={{
                   headerShown: true,
                   animation: 'slide_from_right',

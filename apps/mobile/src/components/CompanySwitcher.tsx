@@ -10,9 +10,11 @@
  * must not remain on screen.
  */
 
-import React, { useEffect, useState } from 'react'
+import React, { useContext, useEffect, useMemo, useState } from 'react'
 import { View, Text, TouchableOpacity, Modal, FlatList, StyleSheet, ActivityIndicator, Alert } from 'react-native'
+import { useTheme } from '../contexts/ThemeContext'
 import { getMyCompanies, switchCompany, getActiveCompanyId } from '../services/companyService'
+import { AuthContext } from '../contexts/AuthContext'
 import type { CompanyMembership } from '../types'
 
 interface CompanySwitcherProps {
@@ -21,6 +23,11 @@ interface CompanySwitcherProps {
 }
 
 export default function CompanySwitcher({ onSwitched }: CompanySwitcherProps) {
+  const { onCompanySwitched } = useContext(AuthContext)
+  // The palette was hardcoded light-mode hex, so in dark mode this control was
+  // white-on-white while every other row on the Settings screen followed the theme.
+  const { colors } = useTheme()
+  const styles = useMemo(() => getStyles(colors), [colors])
   const [companies, setCompanies] = useState<CompanyMembership[]>([])
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
@@ -59,6 +66,9 @@ export default function CompanySwitcher({ onSwitched }: CompanySwitcherProps) {
     }
 
     setActiveCompanyId(companyId)
+    // App-wide reset first — otherwise the host screen reloads while every other
+    // tab keeps the previous company's cached data on screen.
+    await onCompanySwitched()
     onSwitched?.()
   }
 
@@ -112,7 +122,7 @@ export default function CompanySwitcher({ onSwitched }: CompanySwitcherProps) {
   )
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors: any) => StyleSheet.create({
   trigger: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -121,12 +131,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   triggerText: { flex: 1, marginRight: 12 },
-  label: { fontSize: 12, color: '#6B7280', marginBottom: 2 },
-  value: { fontSize: 16, fontWeight: '600', color: '#111827' },
-  chevron: { fontSize: 16, color: '#6B7280' },
+  label: { fontSize: 12, color: colors.textSecondary, marginBottom: 2 },
+  value: { fontSize: 16, fontWeight: '600', color: colors.text },
+  chevron: { fontSize: 16, color: colors.textSecondary },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: '#FFFFFF', borderTopLeftRadius: 16, borderTopRightRadius: 16, paddingBottom: 24, maxHeight: '60%' },
-  sheetTitle: { fontSize: 16, fontWeight: '700', color: '#111827', padding: 16 },
+  sheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingBottom: 24,
+    maxHeight: '60%',
+  },
+  sheetTitle: { fontSize: 16, fontWeight: '700', color: colors.text, padding: 16 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -134,10 +150,10 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E5E7EB',
+    borderTopColor: colors.border,
   },
   rowText: { flex: 1, marginRight: 12 },
-  rowName: { fontSize: 15, fontWeight: '600', color: '#111827' },
-  rowMeta: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  check: { fontSize: 16, color: '#4F46E5', fontWeight: '700' },
+  rowName: { fontSize: 15, fontWeight: '600', color: colors.text },
+  rowMeta: { fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+  check: { fontSize: 16, color: colors.primary, fontWeight: '700' },
 })

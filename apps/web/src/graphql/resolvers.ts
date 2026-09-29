@@ -18,6 +18,8 @@ import { parseMentions, storeMentions } from '@/lib/mention-parser'
 import { createCommentNotification, createReactionNotification, createPostStatusNotification } from '@/lib/notification-helper'
 import { format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, addMinutes } from 'date-fns'
 import { getCurrentDateTime } from '@/lib/datetime-utils'
+import { signAuthToken } from '@/lib/auth-server'
+import { getDefaultCompanyId, isPlatformAdmin as dbIsPlatformAdmin } from '@/lib/db/companies'
 
 // Helper to get current IST time as Date object (for logic comparisons)
 const getISTDate = (date: Date = new Date()) => addMinutes(date, 330) // UTC + 5:30
@@ -230,14 +232,52 @@ export const createContext = () => {
 // ── Auth guards ────────────────────────────────────────────────────────────
 // context.user is populated from the JWT by the GraphQL route. These enforce
 // that a caller is authenticated / authorized before a resolver runs.
-function requireUser(context: any): { employeeId: string; role: string; name: string } {
+/**
+ * The verified JWT claims. `companyId` and `isPlatformAdmin` come from migration
+ * 062; they are optional because tokens issued before it are still valid, and
+ * lib/authz treats an absent company as "resolve from the database".
+ */
+type ResolverActor = {
+  employeeId: string
+  role: string
+  name: string
+  companyId?: string | null
+  isPlatformAdmin?: boolean
+}
+
+function requireUser(context: any): ResolverActor {
   if (!context || !context.user || !context.user.employeeId) {
     throw new Error('UNAUTHENTICATED: You must be signed in.')
   }
   return context.user
 }
 
-function requireRole(context: any, roles: string[]): { employeeId: string; role: string; name: string } {
+/**
+ * Throw unless `actor` may modify this bug. Same rule as the REST route: the
+ * assignee or reporter, a manager or team leader on the bug's project, anyone
+ * above the owner in the reporting chain, or an admin of the bug's company —
+ * and the tenant boundary is applied first.
+ */
+async function assertCanModifyBug(actor: ResolverActor, bugId: string): Promise<void> {
+  const result = await getPoolInstance().query(
+    'SELECT project_id, assigned_to, reported_by, company_id FROM bugs WHERE bug_id = $1',
+    [bugId]
+  )
+  const bug = result.rows[0]
+  if (!bug) throw new Error('NOT_FOUND: Bug not found.')
+
+  const { canEditWorkItem } = await import('@/lib/authz')
+  const allowed = await canEditWorkItem(actor, {
+    projectId: bug.project_id ?? null,
+    ownerEmployeeId: bug.assigned_to || bug.reported_by || null,
+    companyId: bug.company_id ?? null,
+  })
+  if (!allowed) {
+    throw new Error('FORBIDDEN: You do not have permission to modify this bug.')
+  }
+}
+
+function requireRole(context: any, roles: string[]): ResolverActor {
   const user = requireUser(context)
   if (!roles.includes(user.role)) {
     throw new Error('FORBIDDEN: You do not have permission to perform this action.')
@@ -591,10 +631,18 @@ export const resolvers = {
       }
     },
 
-    monthlyAttendance: async (_: any, { year, month, userId }: any, { user }: any) => {
-      if (!user) throw new Error('Unauthorized')
+    monthlyAttendance: async (_: any, { year, month, userId }: any, context: any) => {
+      const user = requireUser(context)
 
       const targetUserId = userId || user.employeeId
+      // `userId` came straight from the client, so anyone could read anyone
+      // else's month of sign-in/sign-out times by passing their employee ID.
+      if (targetUserId !== user.employeeId) {
+        const { canViewUser } = await import('@/lib/authz')
+        if (!(await canViewUser(user, targetUserId))) {
+          throw new Error('FORBIDDEN: You do not have access to this user’s attendance.')
+        }
+      }
       const startDate = `${year}-${String(month).padStart(2, '0')}-01`
       const endDate = new Date(year, month, 0).toISOString().split('T')[0]
 
@@ -819,16 +867,23 @@ export const resolvers = {
       }
     },
 
-    pendingAttendanceRequests: async (_: any, __: any, { user }: any) => {
-      if (!user) throw new Error('Unauthorized')
-      // TODO: Add admin check
+    pendingAttendanceRequests: async (_: any, __: any, context: any) => {
+      const user = requireUser(context)
+
+      // This carried a "TODO: Add admin check", so every signed-in user saw every
+      // pending correction in every company, including the stated reasons.
+      const { getVisibleEmployeeScope } = await import('@/lib/authz')
+      const scope = await getVisibleEmployeeScope(user)
+      if (!scope.all && scope.employeeIds.length === 0) return []
 
       const result = await getPoolInstance().query(
         `SELECT ar.*, u.name as user_name, u.department, u.role
          FROM attendance_requests ar
          JOIN users u ON ar.employee_id = u.employee_id
          WHERE ar.status = 'PENDING'
-         ORDER BY ar.created_at DESC`
+           ${scope.all ? '' : 'AND ar.employee_id = ANY($1)'}
+         ORDER BY ar.created_at DESC`,
+        scope.all ? [] : [scope.employeeIds]
       )
 
       return result.rows.map((row: any) => ({
@@ -1301,6 +1356,8 @@ export const resolvers = {
     createdAt: (user: any) => user.created_at || user.createdAt || getCurrentDateTime(), // Fallback to current time
     updatedAt: (user: any) => user.updated_at || user.updatedAt || getCurrentDateTime(), // Fallback to current time
     tabPermissions: (user: any) => user.tab_permissions || user.tabPermissions,
+    companyId: (user: any) => user.company_id ?? user.companyId ?? null,
+    isPlatformAdmin: (user: any) => user.is_platform_admin ?? user.isPlatformAdmin ?? false,
 
     leavesTakenYTD: async (user: any) => {
       const employeeId = user.employee_id || user.employeeId
@@ -2247,25 +2304,34 @@ export const resolvers = {
           throw new Error('Password login is disabled for this account. Please sign in with OTP.')
         }
 
-        // Generate JWT token (JWT_SECRET is required — no hardcoded fallback)
-        const jwtSecret = process.env.JWT_SECRET
-        if (!jwtSecret || jwtSecret.length < 16) {
-          throw new Error('JWT_SECRET is not configured')
+        // Resolve the company this session acts in, exactly as the REST login
+        // does (lib/auth-server.issueAuthToken). Without these claims the token
+        // carried no company, so every authz check fell back to the pre-tenancy
+        // rules and the mobile app got an unscoped session.
+        let companyId: string | null = null
+        let platformAdmin = false
+        try {
+          companyId = await getDefaultCompanyId(user.employee_id)
+          platformAdmin = await dbIsPlatformAdmin(user.employee_id)
+        } catch (companyError) {
+          // Before migration 062 these tables do not exist; a null company keeps
+          // login working and routes then resolve scope from the database.
+          console.warn('Could not resolve company context for GraphQL login:', companyError)
         }
-        const jwt = require('jsonwebtoken')
-        const token = jwt.sign(
-          {
-            employeeId: user.employee_id,
-            role: user.role,
-            name: user.name
-          },
-          jwtSecret,
-          { expiresIn: '7d' }
-        )
+
+        // signAuthToken owns the claim set and the TTL, so REST and GraphQL
+        // sessions cannot drift apart. It throws if JWT_SECRET is unset.
+        const token = signAuthToken({
+          employeeId: user.employee_id,
+          role: user.role,
+          name: user.name,
+          companyId,
+          isPlatformAdmin: platformAdmin,
+        })
 
         const response = {
           token,
-          user: user
+          user: { ...user, company_id: companyId, is_platform_admin: platformAdmin }
         }
 
         logResolverSuccess('login', response, startTime)
@@ -2404,7 +2470,11 @@ export const resolvers = {
     },
 
     updateBug: async (_: any, { bugId, input }: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
+      // The REST route enforces this (api/bugs/[bugId]/route.ts canModifyBug),
+      // but the mobile app edits through GraphQL, where any signed-in user could
+      // rewrite any bug in any company.
+      await assertCanModifyBug(actor, bugId)
       const updates: string[] = []
       const params: any[] = []
       let paramIndex = 1
@@ -2453,7 +2523,8 @@ export const resolvers = {
     },
 
     deleteBug: async (_: any, { bugId }: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
+      await assertCanModifyBug(actor, bugId)
       await getPoolInstance().query(
         'UPDATE bugs SET deleted_at = NOW() WHERE bug_id = $1',
         [bugId]
@@ -3399,10 +3470,7 @@ export const resolvers = {
     },
 
     approveAttendanceRequest: async (_: any, { requestId }: any, context: any) => {
-      const { user } = context
-      if (!user) throw new Error('Unauthorized')
-      // TODO: Check if user is admin? For now assuming any authorized user can approve (or relying on frontend protection)
-      // Ideally check user.role === 'ADMIN' or similar.
+      const user = requireUser(context)
 
       const client = await getPoolInstance().connect()
       try {
@@ -3417,6 +3485,14 @@ export const resolvers = {
         const request = reqResult.rows[0]
 
         if (request.status !== 'PENDING') throw new Error('Request is not pending')
+
+        // This carried a "TODO: check if user is admin ... relying on frontend
+        // protection" comment, so any signed-in user could approve their own
+        // attendance correction. canApproveFor refuses self-approval.
+        const { canApproveFor } = await import('@/lib/authz')
+        if (!(await canApproveFor(user, request.employee_id))) {
+          throw new Error('FORBIDDEN: You do not have permission to approve this request.')
+        }
 
         // Update request status
         const updateResult = await client.query(
@@ -3537,8 +3613,20 @@ export const resolvers = {
     },
 
     rejectAttendanceRequest: async (_: any, { requestId }: any, context: any) => {
-      const { user } = context
-      if (!user) throw new Error('Unauthorized')
+      const user = requireUser(context)
+
+      // Load the request before changing it: rejecting was an unconditional
+      // UPDATE, so any signed-in user could reject anyone's correction.
+      const existing = await getPoolInstance().query(
+        'SELECT employee_id FROM attendance_requests WHERE id = $1',
+        [requestId]
+      )
+      if (existing.rows.length === 0) throw new Error('Request not found')
+
+      const { canApproveFor } = await import('@/lib/authz')
+      if (!(await canApproveFor(user, existing.rows[0].employee_id))) {
+        throw new Error('FORBIDDEN: You do not have permission to reject this request.')
+      }
 
       const result = await getPoolInstance().query(
         `UPDATE attendance_requests 

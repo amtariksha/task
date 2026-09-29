@@ -17,6 +17,9 @@ export async function GET(
       }, { status: 400 })
     }
 
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
+
     const leave = await getLeaveById(id)
 
     if (!leave) {
@@ -24,6 +27,19 @@ export async function GET(
         success: false,
         error: 'Leave application not found'
       }, { status: 404 })
+    }
+
+    // Reading someone else's application needs the same authority as reading
+    // their records anywhere else. Without this any signed-in user could walk
+    // application IDs and read every employee's leave history and reasons.
+    if (
+      leave.employeeId !== auth.user.employeeId &&
+      !(await canViewUser(auth.user, leave.employeeId))
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'You do not have access to this application.' },
+        { status: 403 }
+      )
     }
 
     return NextResponse.json({
@@ -123,6 +139,27 @@ export async function DELETE(
         success: false,
         error: 'Leave application ID is required'
       }, { status: 400 })
+    }
+
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
+
+    const existing = await getLeaveById(id)
+    if (!existing) {
+      return NextResponse.json({
+        success: false,
+        error: 'Leave application not found'
+      }, { status: 404 })
+    }
+
+    if (
+      existing.employeeId !== auth.user.employeeId &&
+      !(await canViewUser(auth.user, existing.employeeId))
+    ) {
+      return NextResponse.json(
+        { success: false, error: 'You do not have permission to delete this application.' },
+        { status: 403 }
+      )
     }
 
     const deleted = await deleteLeave(id)

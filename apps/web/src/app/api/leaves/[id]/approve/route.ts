@@ -3,6 +3,7 @@ import { approveLeave, getLeaveById } from '@/lib/db/leaves'
 import { getUserByEmployeeId } from '@/lib/db/users'
 import { emailService } from '@/lib/email/service'
 import { requireAuth } from '@/lib/auth-server'
+import { canApproveFor } from '@/lib/authz'
 
 export async function POST(
   request: NextRequest,
@@ -24,18 +25,23 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Authorization: privileged roles approve anyone; otherwise only the
-    // applicant's direct manager may approve. Prevents self-approval.
-    const isPrivileged = ['admin', 'top_management', 'management'].includes(auth.user.role)
-    if (!isPrivileged) {
-      const leaveApp = await getLeaveById(id)
-      const applicant = leaveApp ? await getUserByEmployeeId(leaveApp.employeeId) : null
-      if (!applicant || applicant.managerId !== approverId) {
-        return NextResponse.json(
-          { success: false, error: 'You are not authorized to approve this leave' },
-          { status: 403 }
-        )
-      }
+    // Authorization: lib/authz.canApproveFor is the only rule. It returns false
+    // for self-approval and applies the tenant boundary before any role check.
+    // The previous version short-circuited for 'admin', 'top_management' AND
+    // 'management', so those users could approve their own applications and
+    // anyone else's in any company.
+    const leaveApp = await getLeaveById(id)
+    if (!leaveApp) {
+      return NextResponse.json(
+        { success: false, error: 'Leave application not found' },
+        { status: 404 }
+      )
+    }
+    if (!(await canApproveFor(auth.user, leaveApp.employeeId))) {
+      return NextResponse.json(
+        { success: false, error: 'You are not authorized to approve this leave' },
+        { status: 403 }
+      )
     }
 
     // Approve leave

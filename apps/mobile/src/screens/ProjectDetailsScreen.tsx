@@ -19,7 +19,12 @@ import { SearchablePicker } from '../components/SearchablePicker'
 import ReleaseChecklistEditor from '../components/ReleaseChecklistEditor'
 import { DEFAULT_RELEASE_CHECKLIST } from '../constants/releaseChecklistDefault'
 import { ReleaseChecklistTemplate } from '../types'
-import { canManageProjects as canManageProjectsFn, canDeleteProjects } from '../utils/permissions'
+import {
+  canManageThisProject,
+  canDeleteProjects,
+  type ProjectRole,
+} from '../utils/permissions'
+import { isActiveCompanyAdmin } from '../services/companyService'
 
 interface SubProject {
   projectId: string
@@ -44,7 +49,11 @@ interface ProjectDetails {
 interface AssignedUser {
   employeeId: string
   userName: string
+  /** The user's GLOBAL role (users.role) — not their authority on this project. */
   userRole: string
+  /** Role WITHIN this project (project_users.role) — what actually grants rights. */
+  role?: ProjectRole
+  canEditRequirements?: boolean
   userDepartment?: string
   assignedAt: string
 }
@@ -101,14 +110,27 @@ export default function ProjectDetailsScreen() {
   const [subprojectDesc, setSubprojectDesc] = useState('')
   const [isSubmittingSub, setIsSubmittingSub] = useState(false)
 
+  // The server authorizes per project (lib/authz.canManageProject): the project's
+  // own manager, or an admin of the company that owns it. Gating on the global
+  // role instead meant a 'management' user saw edit controls on every project and
+  // then got a 403, while a project manager without a privileged global role saw
+  // no controls at all.
+  const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
+
+  const myProjectRole = useMemo<ProjectRole | null>(() => {
+    if (!currentUser?.employeeId) return null
+    const mine = assignedUsers.find((u) => u.employeeId === currentUser.employeeId)
+    return mine?.role ?? null
+  }, [assignedUsers, currentUser])
+
   const canManageProjects = useMemo(
-    () => canManageProjectsFn(currentUser),
-    [currentUser]
+    () => canManageThisProject(currentUser, myProjectRole, isCompanyAdmin),
+    [currentUser, myProjectRole, isCompanyAdmin]
   )
 
   const canDelete = useMemo(
-    () => canDeleteProjects(currentUser),
-    [currentUser]
+    () => isCompanyAdmin || myProjectRole === 'manager' || canDeleteProjects(currentUser),
+    [currentUser, myProjectRole, isCompanyAdmin]
   )
 
   const loadData = useCallback(async () => {
@@ -120,6 +142,7 @@ export default function ProjectDetailsScreen() {
       if (user) {
         setCurrentUser(user)
       }
+      setIsCompanyAdmin(await isActiveCompanyAdmin())
 
       // Fetch Project
       const projectRes: any = await apiClient.get(`/api/projects/${projectId}`)
@@ -186,7 +209,6 @@ export default function ProjectDetailsScreen() {
         projectName: editName.trim(),
         description: editDescription.trim() || null,
         status: editStatus,
-        updatedBy: currentUser?.employeeId || 'System'
       }
       // Release config applies to sub-projects only (mirrors web ProjectModal).
       if (isSubproject) {
@@ -254,7 +276,7 @@ export default function ProjectDetailsScreen() {
         parentProjectId: projectId,
         description: subprojectDesc.trim() || null,
         status: 'Active',
-        createdBy: currentUser?.employeeId || 'System'
+        createdBy: currentUser?.employeeId || 'System',
       }
 
       const res = await apiClient.post('/api/projects', payload)

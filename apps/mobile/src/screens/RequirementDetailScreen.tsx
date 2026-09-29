@@ -32,9 +32,11 @@ import { materialColors, materialTypography, materialSpacing } from '../config/m
 import { SearchablePicker } from '../components/SearchablePicker'
 import { getUserData } from '../utils/secureStorage'
 import { getAllUsers, User } from '../services/userService'
+import apiClient from '../services/apiClient'
 import { formatDateTimeIST } from '../utils/datetime'
 import {
   getRequirement,
+  getRequirementEditAccess,
   getSectionRevisions,
   getRequirementBaselines,
   updateRequirement,
@@ -58,17 +60,23 @@ import {
   SECTION_LABELS,
   getRequirementStatusStyle,
   getSectionLabelStyle,
+  hasRichFormatting,
   htmlToPlainText,
   plainTextToHtml,
   previewText,
+  sectionContentUnchanged,
 } from '../utils/requirementHelpers'
+import {
+  canCreateDevItem,
+  canReviewRequirement,
+  canSubmitForReview,
+  lifecycleStatusOptions,
+} from '../utils/requirementPermissions'
 
 type RouteParams = {
   requirementId: string
   projectId?: string
 }
-
-const LIFECYCLE_STATUS_OPTIONS = ['Implemented', 'Verified', 'Deprecated'] as const
 
 export default function RequirementDetailScreen() {
   const { colors } = useTheme()
@@ -82,7 +90,12 @@ export default function RequirementDetailScreen() {
   const [requirement, setRequirement] = useState<Requirement | null>(null)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [users, setUsers] = useState<User[]>([])
+  /** Reviewers and DEV assignees must be project members, not any company user. */
+  const [projectMembers, setProjectMembers] = useState<User[]>([])
   const [baselines, setBaselines] = useState<RequirementBaseline[]>([])
+  // Answered by the server (requirementEditAccess). Every edit control used to be
+  // shown to every project member, so a viewer collected a FORBIDDEN per tap.
+  const [canEdit, setCanEdit] = useState(false)
 
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -154,6 +167,25 @@ export default function RequirementDetailScreen() {
       setCurrentUser(user)
       setUsers(usersRes.success ? usersRes.data || [] : [])
 
+      // Fetched separately: a failure here must not blank the requirement itself.
+      setCanEdit(await getRequirementEditAccess(req.projectId))
+
+      // A non-member cannot open the requirement, so offering them as reviewer or
+      // DEV assignee only produced a dead end.
+      try {
+        const membersRes = await apiClient.get(`/api/projects/${req.projectId}/users`)
+        const rows = membersRes?.success && Array.isArray(membersRes.data) ? membersRes.data : []
+        setProjectMembers(
+          rows.map((pu: any) => ({
+            employeeId: pu.employeeId,
+            name: pu.userName || pu.name || pu.employeeId,
+          })) as User[]
+        )
+      } catch (memberErr) {
+        console.error('Failed to load project members', memberErr)
+        setProjectMembers([])
+      }
+
       try {
         const bl = await getRequirementBaselines(req.projectId)
         setBaselines(bl)
@@ -178,20 +210,24 @@ export default function RequirementDetailScreen() {
   }, [loadData])
 
   // Picker item builders
+  // Fall back to every user only when the member list could not be loaded, so the
+  // pickers are never empty just because one request failed.
+  const candidates = projectMembers.length > 0 ? projectMembers : users
+
   const reviewerItems = useMemo(
     () => [
       { label: '- None -', value: '' },
-      ...users.map((u) => ({ label: u.name, value: u.employeeId })),
+      ...candidates.map((u) => ({ label: u.name, value: u.employeeId })),
     ],
-    [users]
+    [candidates]
   )
 
   const assigneeItems = useMemo(
     () => [
       { label: '- Unassigned -', value: '' },
-      ...users.map((u) => ({ label: u.name, value: u.employeeId })),
+      ...candidates.map((u) => ({ label: u.name, value: u.employeeId })),
     ],
-    [users]
+    [candidates]
   )
 
   const labelItems = useMemo(
@@ -327,6 +363,17 @@ export default function RequirementDetailScreen() {
   }
 
   const openEditSection = (section: RequirementSection) => {
+    // A section authored on the web can hold lists, headings and emphasis that the
+    // plain-text round trip cannot rebuild. Saving it here used to flatten it
+    // silently, so those sections are read-only on mobile.
+    if (hasRichFormatting(section.contentHtml)) {
+      Alert.alert(
+        'Formatted section',
+        'This section was written with formatting (lists, headings or emphasis) that ' +
+          'the mobile editor cannot preserve. Open it on the web to edit it.'
+      )
+      return
+    }
     setEditSection(section)
     setEditSectionHeading(section.heading)
     setEditSectionLabel(section.label)
@@ -335,6 +382,19 @@ export default function RequirementDetailScreen() {
 
   const handleSaveSection = async () => {
     if (!editSection) return
+
+    // Every save writes a revision and returns an approved requirement to In
+    // Review, so saving an untouched section was never harmless. Closing the
+    // dialog with nothing changed now changes nothing.
+    const unchanged =
+      editSectionHeading.trim() === editSection.heading &&
+      editSectionLabel === editSection.label &&
+      sectionContentUnchanged(editSection.contentHtml, editSectionContent)
+    if (unchanged) {
+      setEditSection(null)
+      return
+    }
+
     try {
       setSavingSection(true)
       await updateRequirementSection(editSection.id, {
@@ -510,14 +570,15 @@ export default function RequirementDetailScreen() {
   }
 
   const statusStyle = getRequirementStatusStyle(requirement.status)
-  const canSubmit = requirement.status === 'Draft' || requirement.status === 'Rejected'
-  const isInReview = requirement.status === 'In Review'
-  const isLifecycle =
-    requirement.status === 'Approved' ||
-    requirement.status === 'Implemented' ||
-    requirement.status === 'Verified'
-  const canCreateDev = isLifecycle
-  const lifecycleOptions = LIFECYCLE_STATUS_OPTIONS.filter((s) => s !== requirement.status)
+  const actor = { employeeId: currentUser?.employeeId, role: currentUser?.role }
+  const canSubmit = canEdit && canSubmitForReview(requirement.status)
+  // Approve/Reject were shown to every project member; the server allows only the
+  // designated reviewer (who is not the author) or a privileged role.
+  const canReview = canReviewRequirement(requirement, actor)
+  // The picker offered Implemented, which updateRequirementStatus always rejects.
+  const lifecycleOptions = canEdit ? lifecycleStatusOptions(requirement, actor) : []
+  // DEV items come from an Approved requirement only.
+  const canCreateDev = canEdit && canCreateDevItem(requirement.status)
 
   return (
     <View style={styles.container}>
@@ -532,7 +593,9 @@ export default function RequirementDetailScreen() {
           <Card.Content>
             <View style={styles.titleRow}>
               <Text style={styles.title}>{requirement.title}</Text>
-              <IconButton icon="pencil" size={22} onPress={openEditHeader} style={{ margin: 0 }} />
+              {canEdit ? (
+                <IconButton icon="pencil" size={22} onPress={openEditHeader} style={{ margin: 0 }} />
+              ) : null}
             </View>
 
             <View style={styles.statusRow}>
@@ -579,7 +642,7 @@ export default function RequirementDetailScreen() {
               </Button>
             ) : null}
 
-            {isInReview ? (
+            {canReview ? (
               <View style={styles.reviewActions}>
                 <Button
                   mode="contained"
@@ -602,7 +665,7 @@ export default function RequirementDetailScreen() {
               </View>
             ) : null}
 
-            {isLifecycle && lifecycleOptions.length > 0 ? (
+            {lifecycleOptions.length > 0 ? (
               <View style={styles.statusPicker}>
                 <SearchablePicker
                   label="Change status"
@@ -659,9 +722,11 @@ export default function RequirementDetailScreen() {
           <Card.Content>
             <View style={styles.cardHeaderRow}>
               <Text style={styles.cardTitle}>Sections</Text>
-              <Button compact mode="text" icon="plus" onPress={openCreateSection}>
-                Add Section
-              </Button>
+              {canEdit ? (
+                <Button compact mode="text" icon="plus" onPress={openCreateSection}>
+                  Add Section
+                </Button>
+              ) : null}
             </View>
             <Divider style={styles.divider} />
 
@@ -671,6 +736,7 @@ export default function RequirementDetailScreen() {
               sortedSections.map((section, index) => {
                 const body = htmlToPlainText(section.contentHtml)
                 const labelStyle = getSectionLabelStyle(section.label)
+                const isFormatted = hasRichFormatting(section.contentHtml)
                 return (
                   <View key={section.id} style={styles.subCard}>
                     <View style={styles.subCardHeader}>
@@ -688,40 +754,52 @@ export default function RequirementDetailScreen() {
                       {section.revisionCount} revision(s)
                     </Text>
 
+                    {isFormatted ? (
+                      <Text style={styles.hintText}>
+                        Formatted on the web — edit it there to keep its formatting.
+                      </Text>
+                    ) : null}
+
                     <View style={styles.sectionActions}>
-                      <IconButton
-                        icon="pencil"
-                        size={20}
-                        onPress={() => openEditSection(section)}
-                        style={styles.actionIcon}
-                      />
+                      {canEdit && !isFormatted ? (
+                        <IconButton
+                          icon="pencil"
+                          size={20}
+                          onPress={() => openEditSection(section)}
+                          style={styles.actionIcon}
+                        />
+                      ) : null}
                       <IconButton
                         icon="history"
                         size={20}
                         onPress={() => openHistory(section)}
                         style={styles.actionIcon}
                       />
-                      <IconButton
-                        icon="arrow-up"
-                        size={20}
-                        disabled={index === 0 || reordering}
-                        onPress={() => handleMoveSection(index, -1)}
-                        style={styles.actionIcon}
-                      />
-                      <IconButton
-                        icon="arrow-down"
-                        size={20}
-                        disabled={index === sortedSections.length - 1 || reordering}
-                        onPress={() => handleMoveSection(index, 1)}
-                        style={styles.actionIcon}
-                      />
-                      <IconButton
-                        icon="trash-can-outline"
-                        size={20}
-                        iconColor={colors.error}
-                        onPress={() => handleDeleteSection(section)}
-                        style={styles.actionIcon}
-                      />
+                      {canEdit ? (
+                        <>
+                          <IconButton
+                            icon="arrow-up"
+                            size={20}
+                            disabled={index === 0 || reordering}
+                            onPress={() => handleMoveSection(index, -1)}
+                            style={styles.actionIcon}
+                          />
+                          <IconButton
+                            icon="arrow-down"
+                            size={20}
+                            disabled={index === sortedSections.length - 1 || reordering}
+                            onPress={() => handleMoveSection(index, 1)}
+                            style={styles.actionIcon}
+                          />
+                          <IconButton
+                            icon="trash-can-outline"
+                            size={20}
+                            iconColor={colors.error}
+                            onPress={() => handleDeleteSection(section)}
+                            style={styles.actionIcon}
+                          />
+                        </>
+                      ) : null}
                     </View>
                   </View>
                 )
@@ -729,8 +807,9 @@ export default function RequirementDetailScreen() {
             )}
 
             <Text style={styles.hintText}>
-              Editing a section on mobile saves it as plain text — use the web app for rich
-              formatting.
+              {canEdit
+                ? 'Editing a section on mobile saves it as plain text. Sections written with formatting on the web are read-only here.'
+                : 'You have read-only access to this project’s requirements.'}
             </Text>
           </Card.Content>
         </Card>
@@ -779,7 +858,7 @@ export default function RequirementDetailScreen() {
         </Card>
 
         {/* E. VERSIONS / ROLLBACK CARD */}
-        {baselines.length > 0 ? (
+        {canEdit && baselines.length > 0 ? (
           <Card style={styles.sectionCard}>
             <Card.Content>
               <Text style={styles.cardTitle}>Versions</Text>
@@ -989,16 +1068,18 @@ export default function RequirementDetailScreen() {
                     <Text style={styles.revEditor}>{rev.editorName}</Text>
                     <Text style={styles.revDate}>{formatDateTimeIST(rev.createdAt)}</Text>
                     <Text style={styles.revPreview}>{previewText(rev.contentHtml)}</Text>
-                    <Button
-                      compact
-                      mode="outlined"
-                      onPress={() => handleRestoreRevision(rev)}
-                      loading={restoringRevId === rev.id}
-                      disabled={restoringRevId !== null}
-                      style={styles.restoreBtn}
-                    >
-                      Restore
-                    </Button>
+                    {canEdit ? (
+                      <Button
+                        compact
+                        mode="outlined"
+                        onPress={() => handleRestoreRevision(rev)}
+                        loading={restoringRevId === rev.id}
+                        disabled={restoringRevId !== null}
+                        style={styles.restoreBtn}
+                      >
+                        Restore
+                      </Button>
+                    ) : null}
                   </View>
                 ))}
               </ScrollView>

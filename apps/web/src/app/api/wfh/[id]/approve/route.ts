@@ -3,6 +3,7 @@ import { approveWFH, getWFHById } from '@/lib/db/wfh'
 import { getUserByEmployeeId } from '@/lib/db/users'
 import { emailService } from '@/lib/email/service'
 import { requireAuth } from '@/lib/auth-server'
+import { canApproveFor } from '@/lib/authz'
 
 export async function POST(
   request: NextRequest,
@@ -24,18 +25,22 @@ export async function POST(
       }, { status: 400 })
     }
 
-    // Authorization: privileged roles approve anyone; otherwise only the
-    // applicant's direct manager may approve. Prevents self-approval.
-    const isPrivileged = ['admin', 'top_management', 'management'].includes(auth.user.role)
-    if (!isPrivileged) {
-      const wfhApp = await getWFHById(id)
-      const applicant = wfhApp ? await getUserByEmployeeId(wfhApp.employeeId) : null
-      if (!applicant || applicant.managerId !== approverId) {
-        return NextResponse.json(
-          { success: false, error: 'You are not authorized to approve this WFH request' },
-          { status: 403 }
-        )
-      }
+    // Authorization: lib/authz.canApproveFor is the only rule. It returns false
+    // for self-approval and applies the tenant boundary before any role check.
+    // The previous version short-circuited for 'admin', 'top_management' AND
+    // 'management', so those users could approve their own requests.
+    const wfhApp = await getWFHById(id)
+    if (!wfhApp) {
+      return NextResponse.json(
+        { success: false, error: 'WFH application not found' },
+        { status: 404 }
+      )
+    }
+    if (!(await canApproveFor(auth.user, wfhApp.employeeId))) {
+      return NextResponse.json(
+        { success: false, error: 'You are not authorized to approve this WFH request' },
+        { status: 403 }
+      )
     }
 
     // Approve WFH

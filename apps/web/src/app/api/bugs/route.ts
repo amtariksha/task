@@ -8,6 +8,7 @@ import { createActivityLog } from '@/lib/db/activityLog'
 import { getAuthUser, requireAuth } from '@/lib/auth-server'
 import { getUserProjectIds } from '@/lib/db/project-users'
 import { createNotification } from '@/lib/notification-helper'
+import { workItemNoun, type WorkItemType } from '@/lib/workItemType'
 
 export async function GET(request: NextRequest) {
   try {
@@ -160,8 +161,11 @@ export async function POST(request: NextRequest) {
       (async () => {
         try {
           const creator = await getUserByEmployeeId(bug.assignedBy || bug.reportedBy || 'system')
-          const title = 'New Bug Assigned'
-          const message = `${creator?.name || bug.assignedBy || 'Someone'} assigned you bug: ${bug.title}`
+          // Features, bugs and releases share the bugs table; the in-app title
+          // said "Bug" for all three while the emails already used the real noun.
+          const noun = workItemNoun(bug.type as WorkItemType)
+          const title = `New ${noun} Assigned`
+          const message = `${creator?.name || bug.assignedBy || 'Someone'} assigned you ${noun.toLowerCase()}: ${bug.title}`
           
           await createNotification({
             userId: bug.assignedTo as string,

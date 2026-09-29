@@ -66,6 +66,7 @@ export default function TeamTasksScreen() {
   }, [tasks, selectedProjectIds])
   const [loadingMembers, setLoadingMembers] = useState(true)
   const [loadingTasks, setLoadingTasks] = useState(false)
+  const [tasksError, setTasksError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
 
@@ -134,12 +135,17 @@ export default function TeamTasksScreen() {
       const result = await get(`/api/tasks/user/${selectedEmployee}`)
       if (result.success && result.data) {
         setTasks(result.data || [])
+        setTasksError('')
       } else {
+        // A 403 from the server's per-user access check looked identical to
+        // "this person has no tasks". Show what the server actually said.
         setTasks([])
+        setTasksError(result.error || 'Could not load tasks for this person.')
       }
     } catch (e) {
       console.error('Failed to load tasks:', e)
       setTasks([])
+      setTasksError('Could not load tasks. Check your connection and try again.')
     } finally {
       setLoadingTasks(false)
       setRefreshing(false)
@@ -335,8 +341,14 @@ export default function TeamTasksScreen() {
               }
               ListEmptyComponent={
                 <View style={styles.centered}>
-                  <MaterialCommunityIcons name="checkbox-marked-circle-outline" size={64} color={colors.textSecondary} />
-                  <Text style={styles.emptyText}>No tasks assigned to this member</Text>
+                  <MaterialCommunityIcons
+                    name={tasksError ? 'lock-outline' : 'checkbox-marked-circle-outline'}
+                    size={64}
+                    color={colors.textSecondary}
+                  />
+                  <Text style={styles.emptyText}>
+                    {tasksError || 'No tasks assigned to this member'}
+                  </Text>
                 </View>
               }
             />
