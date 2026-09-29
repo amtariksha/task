@@ -55,6 +55,7 @@ import { ThemeProvider, useTheme, lightColors, darkColors, DrawerProvider, useDr
 import { ToastProvider } from './contexts/ToastContext'
 import { ProjectFilterProvider, useProjectFilter } from './contexts/ProjectFilterContext'
 import { notificationTarget } from './utils/notificationRouting'
+import ProjectSecretsScreen from './screens/ProjectSecretsScreen'
 import { registerForPushNotifications, setupNotificationListeners, cancelAllNotifications, setBadgeCount } from './services/pushNotificationService'
 import Constants from 'expo-constants'
 import * as Application from 'expo-application'
@@ -1389,6 +1390,13 @@ function AppContent() {
                       component={ProjectDetailsScreen}
                       options={{
                         headerTitle: 'Project Details',
+                      }}
+                    />
+                    <Stack.Screen
+                      name="ProjectSecrets"
+                      component={ProjectSecretsScreen}
+                      options={{
+                        headerTitle: 'Project Secrets',
                       }}
                     />
                     <Stack.Screen
