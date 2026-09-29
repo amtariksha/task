@@ -8,7 +8,14 @@
  * - No ENUM restrictions
  */
 
-import { getAuthUser } from '@/lib/auth-server'
+import { getAuthUser, requireAuth } from '@/lib/auth-server'
+import { canAdminCompany, isPlatformAdmin } from '@/lib/authz'
+import {
+  allSettingsKey,
+  dropdownSettingsKey,
+  groupedSettingsKey,
+} from '@/lib/settings/cache-keys'
+import { invalidateSettingsCaches } from '@/lib/settings/invalidate'
 import { NextRequest, NextResponse } from 'next/server'
 import {
   getAllSettings,
@@ -49,7 +56,6 @@ export async function GET(request: NextRequest) {
   // marked private: the in-process cache and the CDN were both keyed globally
   // while the payload is company-specific, so the first tenant to warm the cache
   // served its departments, roles and bug types to every other tenant.
-  const companySuffix = companyId ?? 'platform'
   const PRIVATE_CACHE = 'private, max-age=60, must-revalidate'
   try {
     const searchParams = request.nextUrl.searchParams
@@ -61,7 +67,7 @@ export async function GET(request: NextRequest) {
 
     // Legacy grouped format (for backward compatibility)
     if (grouped) {
-      const cacheKey = `settings_grouped_${companySuffix}`
+      const cacheKey = groupedSettingsKey(companyId)
       if (await cache.has(cacheKey)) {
         const res = NextResponse.json({ success: true, data: await cache.get<any>(cacheKey), source: 'cache' })
         res.headers.set('Cache-Control', PRIVATE_CACHE)
@@ -76,7 +82,7 @@ export async function GET(request: NextRequest) {
 
     // Get dropdown settings only
     if (dropdowns) {
-      const cacheKey = `settings_dropdowns_${companySuffix}`
+      const cacheKey = dropdownSettingsKey(companyId)
       if (await cache.has(cacheKey)) {
         const res = NextResponse.json({ success: true, data: await cache.get<any>(cacheKey), source: 'cache' })
         res.headers.set('Cache-Control', PRIVATE_CACHE)
@@ -120,7 +126,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all settings
-    const cacheKeyAll = `settings_all_active_${activeOnly ? '1' : '0'}_${companySuffix}`
+    const cacheKeyAll = allSettingsKey(companyId, activeOnly)
     if (await cache.has(cacheKeyAll)) {
       const cached = await cache.get<any[]>(cacheKeyAll) || []
       const res = NextResponse.json({ success: true, data: cached, count: cached.length, source: 'cache' })
@@ -183,14 +189,41 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    // This route had NO authorization: any signed-in user could create a setting,
+    // and `createdBy` came from the body. A setting drives the dropdowns every
+    // screen reads, so it takes company-admin authority.
+    const auth = await requireAuth(request)
+    if (!auth.ok) return auth.response
+
     const body = await request.json()
 
-    // Validate required fields
-    if (!body.key || body.value === undefined || !body.createdBy) {
+    // A platform default (no company) is visible to every company that has no
+    // override, so only a platform admin may create one.
+    const targetCompanyId: string | null =
+      typeof body.companyId === 'string' && body.companyId
+        ? body.companyId
+        : auth.user.companyId ?? null
+
+    if (targetCompanyId === null) {
+      if (!(await isPlatformAdmin(auth.user))) {
+        return NextResponse.json(
+          { success: false, error: 'Only a platform admin can create a platform-wide setting.' },
+          { status: 403 }
+        )
+      }
+    } else if (!(await canAdminCompany(auth.user, targetCompanyId))) {
+      return NextResponse.json(
+        { success: false, error: 'You do not administer this company.' },
+        { status: 403 }
+      )
+    }
+
+    // Validate required fields. `createdBy` now comes from the session.
+    if (!body.key || body.value === undefined) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Missing required fields: key, value, createdBy'
+          error: 'Missing required fields: key, value'
         },
         { status: 400 }
       )
@@ -212,16 +245,13 @@ export async function POST(request: NextRequest) {
       value: body.value,
       description: body.description,
       metadata: body.metadata,
-      createdBy: body.createdBy
+      createdBy: auth.user.employeeId,
+      companyId: targetCompanyId
     }
 
     const newSetting = await createSetting(settingData)
 
-    // Invalidate all settings caches
-    await cache.delete('settings_grouped')
-    await cache.delete('settings_dropdowns')
-    await cache.delete('settings_all_active_1')
-    await cache.delete('settings_all_active_0')
+    await invalidateSettingsCaches(targetCompanyId)
 
     return NextResponse.json({
       success: true,

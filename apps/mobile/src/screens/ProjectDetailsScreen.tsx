@@ -80,6 +80,7 @@ export default function ProjectDetailsScreen() {
 
   const styles = useMemo(() => getStyles(colors, responsive), [colors, responsive])
 
+
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [project, setProject] = useState<ProjectDetails | null>(null)
   const [assignedUsers, setAssignedUsers] = useState<AssignedUser[]>([])
@@ -116,6 +117,7 @@ export default function ProjectDetailsScreen() {
   // then got a 403, while a project manager without a privileged global role saw
   // no controls at all.
   const [isCompanyAdmin, setIsCompanyAdmin] = useState(false)
+  const [settingRoleFor, setSettingRoleFor] = useState<string | null>(null)
 
   const myProjectRole = useMemo<ProjectRole | null>(() => {
     if (!currentUser?.employeeId) return null
@@ -320,6 +322,38 @@ export default function ProjectDetailsScreen() {
       setIsAssigningUser(false)
     }
   }
+
+  /**
+   * Set a member's role within THIS project.
+   *
+   * project_users.role is what actually grants authority here — editing the
+   * project, changing its members, reading or writing its secrets — and until now
+   * it was invisible on mobile and only settable with SQL.
+   */
+  const handleSetProjectRole = async (targetEmployeeId: string, role: ProjectRole) => {
+    setSettingRoleFor(targetEmployeeId)
+    try {
+      const res = await apiClient.apiRequest(`/api/projects/${projectId}/users`, {
+        method: 'PATCH',
+        body: JSON.stringify({ employeeId: targetEmployeeId, role }),
+      })
+      if (res && res.success) {
+        await loadData()
+      } else {
+        Alert.alert('Error', res?.error || 'Could not change this member\u2019s project role')
+      }
+    } catch (err) {
+      console.error('Failed to set project role', err)
+      Alert.alert('Error', 'Could not change this member\u2019s project role')
+    } finally {
+      setSettingRoleFor(null)
+    }
+  }
+
+  /** Cycle member -> team leader -> manager -> member. A picker per row is too
+   *  much chrome for a phone; tapping the badge is enough for three values. */
+  const cycleProjectRole = (current?: ProjectRole): ProjectRole =>
+    current === 'manager' ? 'member' : current === 'team_leader' ? 'manager' : 'team_leader'
 
   const handleRemoveUser = async (targetEmployeeId: string, userName: string) => {
     try {
@@ -550,6 +584,33 @@ export default function ProjectDetailsScreen() {
           </TouchableOpacity>
         </Card>
 
+        {/* Secrets — read-only vault. Anyone on the project may look; the server
+            refuses a non-member, so the entry point is safe to always show. */}
+        <Card style={styles.sectionCard}>
+          <Card.Content>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionCardTitle}>Secrets</Text>
+              <Button
+                compact
+                mode="text"
+                icon="key-variant"
+                onPress={() =>
+                  navigation.navigate('ProjectSecrets', {
+                    projectId,
+                    projectName: project.projectName,
+                  })
+                }
+              >
+                Open vault
+              </Button>
+            </View>
+            <Text style={styles.hintText}>
+              Credential names and environment keys. Revealing a value asks for your fingerprint or
+              face and is recorded in the project's access log.
+            </Text>
+          </Card.Content>
+        </Card>
+
         {/* Subprojects Section */}
         {!project.parentProjectId ? (
           <Card style={styles.sectionCard}>
@@ -611,7 +672,32 @@ export default function ProjectDetailsScreen() {
                     <Avatar.Text size={36} label={getInitials(u.userName)} style={styles.userAvatar} />
                     <View style={styles.userInfo}>
                       <Text style={styles.userName}>{u.userName}</Text>
-                      <Text style={styles.userDetails}>{u.employeeId} • {u.userRole} • {u.userDepartment || 'N/A'}</Text>
+                      <Text style={styles.userDetails}>{u.employeeId} • {u.userDepartment || 'N/A'}</Text>
+                      {/* Role in THIS project. The row used to show only the
+                          global users.role, which says nothing about authority
+                          here. Tap to cycle it if you manage the project. */}
+                      <TouchableOpacity
+                        disabled={!canManageProjects || settingRoleFor === u.employeeId}
+                        onPress={() => handleSetProjectRole(u.employeeId, cycleProjectRole(u.role))}
+                        style={[
+                          styles.roleBadge,
+                          { backgroundColor: u.role === 'manager' ? '#EDE9FE' : u.role === 'team_leader' ? '#E8F0FE' : '#F1F3F4' },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.roleBadgeText,
+                            { color: u.role === 'manager' ? '#6D28D9' : u.role === 'team_leader' ? '#1967D2' : '#5F6368' },
+                          ]}
+                        >
+                          {settingRoleFor === u.employeeId
+                            ? 'saving…'
+                            : u.role === 'team_leader'
+                              ? 'team leader'
+                              : u.role || 'member'}
+                          {canManageProjects ? ' ›' : ''}
+                        </Text>
+                      </TouchableOpacity>
                     </View>
                     {canManageProjects ? (
                       <IconButton
@@ -902,6 +988,22 @@ const getStyles = (colors: any, responsive: any) => StyleSheet.create({
   userDetails: {
     fontSize: 11,
     color: colors.textSecondary,
+  },
+  hintText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    marginTop: 6,
+  },
+  roleBadge: {
+    alignSelf: 'flex-start',
+    marginTop: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  roleBadgeText: {
+    fontSize: 10,
+    fontWeight: '600',
   },
   searchUserItem: {
     flexDirection: 'row',

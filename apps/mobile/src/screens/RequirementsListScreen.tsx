@@ -88,6 +88,12 @@ export default function RequirementsListScreen() {
 
   // Controls
   const [search, setSearch] = useState('')
+  /**
+   * `search` updates per keystroke for the input; this trails it by 350ms and is
+   * what actually goes to the server. Without the delay every character fired a
+   * request.
+   */
+  const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('All')
   const [includeSubprojects, setIncludeSubprojects] = useState(false)
 
@@ -116,6 +122,9 @@ export default function RequirementsListScreen() {
       const reqs = await getRequirements(projectId, {
         includeSubprojects,
         status: statusFilter !== 'All' ? statusFilter : undefined,
+        // Searching server-side as well: the client filter only ever saw the rows
+        // already loaded, so a match further down the project was invisible.
+        search: searchQuery.trim() || undefined,
       })
       setRequirements(reqs)
 
@@ -171,7 +180,12 @@ export default function RequirementsListScreen() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [projectId, includeSubprojects, statusFilter])
+  }, [projectId, includeSubprojects, statusFilter, searchQuery])
+
+  useEffect(() => {
+    const timer = setTimeout(() => setSearchQuery(search), 350)
+    return () => clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     loadData()
@@ -203,7 +217,21 @@ export default function RequirementsListScreen() {
     }
   }, [viewerBaseline])
 
-  const handleFreeze = async () => {
+  const handleFreeze = () => {
+    // Freezing snapshots the whole project AND bulk-approves every unapproved
+    // requirement in it. That is a lot to do behind a button labelled "Freeze".
+    Alert.alert(
+      'Freeze this version?',
+      'A snapshot of every requirement in this project is taken, and any that are not yet ' +
+        'approved are approved as part of the freeze. Frozen versions cannot be edited.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Freeze', style: 'destructive', onPress: () => { void performFreeze() } },
+      ]
+    )
+  }
+
+  const performFreeze = async () => {
     try {
       setFreezing(true)
       const result = await createRequirementBaseline(

@@ -57,6 +57,7 @@ export default function ProjectDetailsPage() {
   const [loadingAssignedUsers, setLoadingAssignedUsers] = useState(false)
   const [removingUserId, setRemovingUserId] = useState<string | null>(null)
   const [togglingReqEditId, setTogglingReqEditId] = useState<string | null>(null)
+  const [settingRoleFor, setSettingRoleFor] = useState<string | null>(null)
   const [removalWarning, setRemovalWarning] = useState<{
     employeeId: string
     userName: string
@@ -187,6 +188,37 @@ export default function ProjectDetailsPage() {
       alert('Failed to update requirements-edit permission')
     } finally {
       setTogglingReqEditId(null)
+    }
+  }
+
+  /**
+   * Set a member's role WITHIN this project.
+   *
+   * project_users.role is the tier the global users.role cannot express: the same
+   * person manages one project and is simply a member of another. It decides who
+   * may edit the project, change its members, and read or write its stored
+   * secrets — and until now it could only be changed with SQL.
+   */
+  const handleSetProjectRole = async (targetEmployeeId: string, role: string) => {
+    setSettingRoleFor(targetEmployeeId)
+    try {
+      const response = await fetch(`/api/projects/${projectId}/users`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId: targetEmployeeId, role })
+      })
+
+      if (response.ok) {
+        await fetchAssignedUsers()
+      } else {
+        const result = await response.json().catch(() => ({}))
+        alert(result.error || 'Failed to change this member\u2019s project role')
+      }
+    } catch (err) {
+      console.error('Error setting project role:', err)
+      alert('Failed to change this member\u2019s project role')
+    } finally {
+      setSettingRoleFor(null)
     }
   }
 
@@ -756,11 +788,17 @@ export default function ProjectDetailsPage() {
                       <span className="font-medium text-gray-900">{au.userName}</span>
                       <span className="text-sm text-gray-500 ml-2">{au.employeeId}</span>
                     </div>
+                    {/* Role in THIS project — what actually grants authority here.
+                        The badge used to show the global users.role, which says
+                        nothing about what someone may do on this project. */}
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                      au.userRole === 'admin' ? 'bg-purple-100 text-purple-800' :
-                      au.userRole === 'top_management' ? 'bg-blue-100 text-blue-800' :
+                      au.role === 'manager' ? 'bg-purple-100 text-purple-800' :
+                      au.role === 'team_leader' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
+                      {au.role === 'team_leader' ? 'team leader' : au.role || 'member'}
+                    </span>
+                    <span className="text-xs text-gray-400" title="Global role">
                       {au.userRole}
                     </span>
                     {au.userDepartment && (
@@ -768,6 +806,19 @@ export default function ProjectDetailsPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-3">
+                    {canManageProjects && (
+                      <select
+                        value={au.role || 'member'}
+                        disabled={settingRoleFor === au.employeeId}
+                        onChange={(e) => handleSetProjectRole(au.employeeId, e.target.value)}
+                        className="border border-gray-300 rounded px-2 py-1 text-xs disabled:opacity-50"
+                        title="Role in this project: a manager runs it, a team leader may change its secrets"
+                      >
+                        <option value="member">Member</option>
+                        <option value="team_leader">Team leader</option>
+                        <option value="manager">Manager</option>
+                      </select>
+                    )}
                     {canManageProjects && (
                       <label
                         className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer"

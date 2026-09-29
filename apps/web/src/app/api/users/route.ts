@@ -62,6 +62,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
+/**
+ * Global roles that could create users before the company tier existed. Only
+ * consulted for a session with no company at all.
+ */
+const LEGACY_USER_ADMIN_ROLES = ['admin', 'top_management']
+
 /** Turn a PostgreSQL error into something an admin can actually act on. */
 function describeCreateUserError(error: unknown): { message: string; status: number } {
   const code = (error as { code?: string })?.code
@@ -88,7 +94,10 @@ function describeCreateUserError(error: unknown): { message: string; status: num
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await requireRole(request, ['admin', 'top_management'])
+    // canManageUsers, not a global role: a company_admin administers their own
+    // company's people even with a plain `employee` global role, which is the whole
+    // point of the company tier. The legacy global admins still pass through it.
+    const auth = await requireAuth(request)
     if (!auth.ok) return auth.response
 
     const userData = await request.json()
@@ -100,9 +109,19 @@ export async function POST(request: NextRequest) {
       ? userData.companyId
       : auth.user.companyId
 
-    if (targetCompanyId && !(await canManageUsers(auth.user, targetCompanyId))) {
+    if (targetCompanyId) {
+      if (!(await canManageUsers(auth.user, targetCompanyId))) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have permission to add users to this company.' },
+          { status: 403 }
+        )
+      }
+    } else if (!LEGACY_USER_ADMIN_ROLES.includes(auth.user.role) && !auth.user.isPlatformAdmin) {
+      // No company context at all — a token issued before migration 062. Fall back
+      // to the pre-tenancy rule rather than to nothing: without this branch,
+      // dropping requireRole above would have let any signed-in user create users.
       return NextResponse.json(
-        { success: false, error: 'You do not have permission to add users to this company.' },
+        { success: false, error: 'You do not have permission to add users.' },
         { status: 403 }
       )
     }

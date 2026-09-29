@@ -6,6 +6,7 @@
 import nodemailer from 'nodemailer'
 import { EMAIL_CONFIG, EmailType, EmailPriority } from './config'
 import { workItemSubject, type WorkItemType } from '../workItemType'
+import { brandingForCompany } from './branding'
 import {
   getUserCredentialsHtmlTemplate,
   getTaskCreationHtmlTemplate,
@@ -273,10 +274,16 @@ export class EmailService {
     department: string
     role: string
     manager?: string
+    /** Company the user is joining; falls back to the platform brand. */
+    companyId?: string | null
   }) {
     try {
       console.log('📧 Ensuring email service is initialized...')
       await this.ensureInitialized()
+
+      // brandingForCompany existed but had no callers, so every company's new
+      // users were welcomed in the platform's name.
+      const branding = await brandingForCompany(data.companyId)
 
       console.log('📧 Generating user credentials email template...')
       const html = getUserCredentialsHtmlTemplate({
@@ -288,12 +295,14 @@ export class EmailService {
         role: data.role,
         manager: data.manager,
         baseUrl: EMAIL_CONFIG.templates.baseUrl,
+        companyName: branding.companyName,
+        logoUrl: branding.logoUrl,
       })
 
       console.log('📧 Sending user credentials email...')
       return await this.sendEmail({
         to: data.userEmail,
-        subject: `🔐 Welcome to ${EMAIL_CONFIG.templates.companyName} - Your Account Details`,
+        subject: `🔐 Welcome to ${branding.companyName} - Your Account Details`,
         html,
         priority: 'high',
         type: 'user_credentials',

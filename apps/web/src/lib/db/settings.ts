@@ -22,6 +22,8 @@ import { query } from './index'
 export interface Setting {
   id: number
   key: string
+  /** Owning company, or null for the platform default every company falls back to. */
+  companyId: string | null
   value: any // JSON value (can be array, object, string, number, boolean)
   description: string | null
   metadata: any | null // JSON metadata (validation rules, UI hints, etc.)
@@ -40,6 +42,11 @@ export interface CreateSettingData {
   description?: string
   metadata?: any // Will be JSON stringified
   createdBy: string
+  /**
+   * Company this setting belongs to. Null creates a PLATFORM default, which every
+   * company without its own override then sees — only a platform admin may do that.
+   */
+  companyId?: string | null
 }
 
 /**
@@ -89,6 +96,7 @@ export async function getSettingById(id: number): Promise<Setting | null> {
         value,
         description,
         metadata,
+        company_id,
         is_active as is_active,
         created_by as createdBy,
         created_at as created_at,
@@ -137,6 +145,7 @@ export async function getSettingById(id: number): Promise<Setting | null> {
       value: parsedValue,
       description: row.description,
       metadata: parsedMetadata,
+      companyId: row.company_id ?? null,
       isActive: Boolean(row.is_active),
       createdBy: row.createdBy,
       createdAt: row.created_at,
@@ -170,6 +179,7 @@ export async function getSettingByKey(key: string, companyId?: string | null): P
         value,
         description,
         metadata,
+        company_id,
         is_active as is_active,
         created_by as createdBy,
         created_at as created_at,
@@ -221,6 +231,7 @@ export async function getSettingByKey(key: string, companyId?: string | null): P
       value: parsedValue,
       description: row.description,
       metadata: parsedMetadata,
+      companyId: row.company_id ?? null,
       isActive: Boolean(row.is_active),
       createdBy: row.createdBy,
       createdAt: row.created_at,
@@ -267,6 +278,7 @@ export async function getAllSettings(
         value,
         description,
         metadata,
+        company_id,
         is_active as is_active,
         created_by as createdBy,
         created_at as created_at,
@@ -317,6 +329,7 @@ export async function getAllSettings(
         value: parsedValue,
         description: row.description,
         metadata: parsedMetadata,
+        companyId: row.company_id ?? null,
         isActive: Boolean(row.is_active),
         createdBy: row.createdBy,
         createdAt: row.created_at,
@@ -417,8 +430,9 @@ export async function createSetting(data: CreateSettingData): Promise<Setting> {
         value,
         description,
         metadata,
-        created_by
-      ) VALUES ($1, $2, $3, $4, $5)
+        created_by,
+        company_id
+      ) VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING id
     `
 
@@ -430,7 +444,8 @@ export async function createSetting(data: CreateSettingData): Promise<Setting> {
       valueJson,
       data.description || null,
       metadataJson,
-      data.createdBy
+      data.createdBy,
+      data.companyId ?? null
     ])
 
     if (!result || result.length === 0) {

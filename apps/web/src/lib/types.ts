@@ -472,12 +472,21 @@ export interface Project {
  * Used for project access control — only assigned users (plus admin/top_management)
  * can see a project.
  */
+/** Authority INSIDE one project. Distinct from users.role, which is global. */
+export type ProjectRole = 'manager' | 'team_leader' | 'member'
+
 export interface ProjectUser {
   projectId: string
   employeeId: string
   assignedBy: string
   assignedAt: string
   canEditRequirements: boolean
+  /**
+   * Role within this project (migration 062). This is the tier that decides who
+   * may edit the project, change its members and read or write its secrets — the
+   * global users.role cannot express "manages one project, member of another".
+   */
+  role: ProjectRole
 }
 
 export interface ProjectUserWithUser extends ProjectUser {

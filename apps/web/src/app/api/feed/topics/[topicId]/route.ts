@@ -75,11 +75,21 @@ export async function PATCH(
     }
 
     values.push(topicId)
+    const topicIdParam = values.length
+
+    // The tab permission alone said nothing about WHICH company's topics, so
+    // someone holding it could rename another tenant's topics by id. A
+    // cross-company id now simply does not match, and the handler answers 404.
+    let companyPredicate = ''
+    if (user.companyId && !user.isPlatformAdmin) {
+      values.push(user.companyId)
+      companyPredicate = ` AND (company_id IS NULL OR company_id = $${values.length})`
+    }
 
     const result = await query(
       `UPDATE feed_topics 
        SET ${updates.join(', ')}
-       WHERE id = $${paramIndex} AND deleted_at IS NULL
+       WHERE id = $${topicIdParam} AND deleted_at IS NULL${companyPredicate}
        RETURNING *`,
       values
     )
@@ -147,13 +157,21 @@ export async function DELETE(
 
     const { topicId } = await params
 
-    // Soft delete the topic
+    // Soft delete the topic. Same company predicate as PATCH: the tab permission
+    // does not say which tenant's topics the caller may remove.
+    const values: any[] = [user.employeeId, topicId]
+    let companyPredicate = ''
+    if (user.companyId && !user.isPlatformAdmin) {
+      values.push(user.companyId)
+      companyPredicate = ` AND (company_id IS NULL OR company_id = $${values.length})`
+    }
+
     const result = await query(
       `UPDATE feed_topics 
        SET deleted_at = CURRENT_TIMESTAMP, deleted_by = $1
-       WHERE id = $2 AND deleted_at IS NULL
+       WHERE id = $2 AND deleted_at IS NULL${companyPredicate}
        RETURNING *`,
-      [user.employeeId, topicId]
+      values
     )
 
     if (result.length === 0) {

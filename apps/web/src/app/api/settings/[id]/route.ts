@@ -4,15 +4,67 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { requireRole } from '@/lib/auth-server'
+import { requireAuth } from '@/lib/auth-server'
+import { canAdminCompany, isPlatformAdmin } from '@/lib/authz'
 import {
   getSettingById,
   updateSetting,
   deleteSetting,
   permanentlyDeleteSetting,
+  type Setting,
   type UpdateSettingData
 } from '@/lib/db/settings'
-import { cache } from '@/lib/cache'
+import { invalidateSettingsCaches } from '@/lib/settings/invalidate'
+import type { NextResponse as NextResponseType } from 'next/server'
+
+/**
+ * Require authority over the company that owns this setting.
+ *
+ * `requireRole(['admin','top_management'])` used to guard these handlers, which
+ * was wrong twice over: it shut out a company_admin who has no global role, and it
+ * let a global admin of one company edit another company's row. A platform row
+ * (company_id IS NULL) is every company's fallback, so only a platform admin may
+ * touch it.
+ */
+async function requireSettingAdmin(
+  request: NextRequest,
+  settingId: number
+): Promise<
+  | { ok: true; setting: Setting; actor: { employeeId: string; role: string; companyId?: string | null; isPlatformAdmin?: boolean } }
+  | { ok: false; response: NextResponseType }
+> {
+  const auth = await requireAuth(request)
+  if (!auth.ok) return { ok: false, response: auth.response }
+
+  const setting = await getSettingById(settingId)
+  if (!setting) {
+    return {
+      ok: false,
+      response: NextResponse.json({ success: false, error: 'Setting not found' }, { status: 404 }),
+    }
+  }
+
+  const allowed = setting.companyId === null
+    ? await isPlatformAdmin(auth.user)
+    : await canAdminCompany(auth.user, setting.companyId)
+
+  if (!allowed) {
+    return {
+      ok: false,
+      response: NextResponse.json(
+        {
+          success: false,
+          error: setting.companyId === null
+            ? 'Only a platform admin can change a platform-wide setting.'
+            : 'You do not administer the company this setting belongs to.',
+        },
+        { status: 403 }
+      ),
+    }
+  }
+
+  return { ok: true, setting, actor: auth.user }
+}
 
 /**
  * GET /api/settings/[id]
@@ -81,9 +133,6 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole(request, ['admin', 'top_management'])
-    if (!auth.ok) return auth.response
-
     const { id } = await context.params
     const settingId = parseInt(id)
 
@@ -96,6 +145,9 @@ export async function PATCH(
         { status: 400 }
       )
     }
+
+    const guard = await requireSettingAdmin(request, settingId)
+    if (!guard.ok) return guard.response
 
     const body = await request.json()
 
@@ -129,11 +181,7 @@ export async function PATCH(
 
     const updatedSetting = await updateSetting(settingId, updateData)
 
-    // Invalidate all settings caches
-    await cache.delete('settings_grouped')
-    await cache.delete('settings_dropdowns')
-    await cache.delete('settings_all_active_1')
-    await cache.delete('settings_all_active_0')
+    await invalidateSettingsCaches(guard.setting.companyId)
 
     return NextResponse.json({
       success: true,
@@ -174,9 +222,6 @@ export async function DELETE(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const auth = await requireRole(request, ['admin', 'top_management'])
-    if (!auth.ok) return auth.response
-
     const { id } = await context.params
     const settingId = parseInt(id)
 
@@ -190,6 +235,9 @@ export async function DELETE(
       )
     }
 
+    const guard = await requireSettingAdmin(request, settingId)
+    if (!guard.ok) return guard.response
+
     const searchParams = request.nextUrl.searchParams
     const permanent = searchParams.get('permanent') === 'true'
 
@@ -199,11 +247,7 @@ export async function DELETE(
       await deleteSetting(settingId)
     }
 
-    // Invalidate all settings caches
-    await cache.delete('settings_grouped')
-    await cache.delete('settings_dropdowns')
-    await cache.delete('settings_all_active_1')
-    await cache.delete('settings_all_active_0')
+    await invalidateSettingsCaches(guard.setting.companyId)
 
     return NextResponse.json({
       success: true,

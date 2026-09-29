@@ -40,7 +40,8 @@ import {
   ChevronRight,
   Sun,
   Moon,
-  Sunrise
+  Sunrise,
+  Building2,
 } from 'lucide-react'
 
 interface MeIsFounderData { me: { employeeId: string; isFounder: boolean | null } | null }
@@ -163,6 +164,7 @@ export default function Navbar() {
       key: 'admin_group',
       children: [
         { label: 'Projects', href: '/projects', icon: FolderKanban, key: 'projects' },
+        { label: 'Company', href: '/company', icon: Building2, key: 'company' },
         { label: 'User Management', href: '/users', icon: UserCog, key: 'user_management' },
         { label: 'Feed Topics', href: '/feed-topics', icon: MessageSquare, key: 'feed_topics' },
         { label: 'Approvals', href: '/approvals', icon: ClipboardCheck, key: 'approvals' },
@@ -189,7 +191,12 @@ export default function Navbar() {
         // 'founder_start' is not a tab permission: only the founder (or platform admin) sees it; /start re-checks on the server.
         child.key === 'founder_start'
           ? showFounderStart
-          : child.key === 'requirements' ? true : (child.key ? hasTabAccess(currentUser, child.key) : true)
+          // 'company' is not a tab permission: everyone who belongs to a company
+          // may see who else is in it, and the page itself only offers the
+          // management controls to a company admin (the API enforces it).
+          : child.key === 'company' || child.key === 'requirements'
+            ? true
+            : (child.key ? hasTabAccess(currentUser, child.key) : true)
       )
 
       // If no children left, return null (unless it's a group that should show empty? No, hide it)

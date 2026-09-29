@@ -8,6 +8,12 @@ import type { FounderCloseoutEntryInput, FounderThread } from '../../types/found
 
 export const CLOSEOUT_FOCUS_DELAY_MS = 150
 
+/**
+ * The server's own limit (founder-resolvers MAX_TEXT). Enforced in the inputs so a
+ * long close-out cannot be rejected after it has all been typed.
+ */
+export const MAX_CLOSEOUT_TEXT = 2000
+
 /** One close-out chip: an existing thread, or a pending new thread (thread === null). */
 export interface CloseoutChipItem { key: string; label: string; thread: FounderThread | null }
 export interface CloseoutEntryDraft { nextAction: string; note: string; waitingOn: string; showDetails: boolean }
@@ -63,6 +69,10 @@ export function FounderCloseoutEntry({ item, draft, focusNonce, onChange }: Foun
         mode="outlined"
         multiline
         dense
+        // The server rejects anything over 2000 characters (founder-resolvers
+        // MAX_TEXT), and it did so only on submit — after the whole close-out was
+        // typed. Stopping at the limit here means the save cannot fail on length.
+        maxLength={MAX_CLOSEOUT_TEXT}
         label="Next action"
         placeholder={item.thread?.nextAction || 'One physical step'}
         value={draft.nextAction}
@@ -76,6 +86,7 @@ export function FounderCloseoutEntry({ item, draft, focusNonce, onChange }: Foun
             mode="outlined"
             multiline
             dense
+            maxLength={MAX_CLOSEOUT_TEXT}
             label="What happened"
             value={draft.note}
             onChangeText={(text) => onChange(item, { note: text })}
@@ -85,6 +96,7 @@ export function FounderCloseoutEntry({ item, draft, focusNonce, onChange }: Foun
           <TextInput
             mode="outlined"
             dense
+            maxLength={MAX_CLOSEOUT_TEXT}
             label="Waiting on"
             value={draft.waitingOn}
             onChangeText={(text) => onChange(item, { waitingOn: text })}

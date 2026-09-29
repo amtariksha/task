@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } from 'react'
-import { ScrollView, StyleSheet, View } from 'react-native'
+import { Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { ActivityIndicator, Button, Divider, IconButton, Text } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useNavigation } from '@react-navigation/native'
@@ -129,6 +129,34 @@ export function FounderRankScreen(): JSX.Element {
       showToast(errorText(caught, 'Could not load threads'), 'error')
     }
   }, [refetch, showToast])
+
+  /**
+   * Has the order been changed but not saved? The screen is entirely local until
+   * Save, so a back gesture silently discarded the whole re-rank.
+   */
+  const hasUnsavedChanges = useMemo(() => {
+    if (!lists || !Array.isArray(threads)) return false
+    const original = splitByRank(threads)
+    const sameOrder = (a: FounderThread[], b: FounderThread[]) =>
+      a.length === b.length && a.every((item, i) => item.id === b[i]?.id)
+    return !sameOrder(original.ranked, lists.ranked) || !sameOrder(original.unranked, lists.unranked)
+  }, [lists, threads])
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return
+    const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
+      event.preventDefault()
+      Alert.alert(
+        'Discard your new order?',
+        'The ranking has not been saved yet.',
+        [
+          { text: 'Keep editing', style: 'cancel' },
+          { text: 'Discard', style: 'destructive', onPress: () => navigation.dispatch(event.data.action) },
+        ]
+      )
+    })
+    return unsubscribe
+  }, [navigation, hasUnsavedChanges])
 
   const handleSave = useCallback(async () => {
     if (!lists) return

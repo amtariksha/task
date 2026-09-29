@@ -222,20 +222,165 @@ export async function bulkUpsertEnvSecrets(
 // Audit
 // ---------------------------------------------------------------------------
 
+/** Where a reveal came from. Recorded so devices can be told apart. */
+export type AccessClient = 'web' | 'mobile' | 'api'
+
+export interface AccessContext {
+  credentialId?: number
+  /** The env key revealed. Env secrets have no credentialId of their own. */
+  keyName?: string
+  client?: AccessClient
+  ip?: string
+  userAgent?: string
+}
+
 export async function logCredentialAccess(
   projectId: string,
   accessedBy: string,
   action: AccessAction,
-  credentialId?: number
+  credentialIdOrContext?: number | AccessContext
 ): Promise<void> {
+  // Called as (…, credentialId) from the existing routes and as (…, context) from
+  // the ones that know more. Keeping both shapes avoids touching every call site
+  // to add a field that is optional anyway.
+  const context: AccessContext =
+    typeof credentialIdOrContext === 'number'
+      ? { credentialId: credentialIdOrContext }
+      : credentialIdOrContext ?? {}
+
   try {
     await query(
-      `INSERT INTO credential_access_log (project_id, credential_id, accessed_by, action)
-       VALUES ($1, $2, $3, $4)`,
-      [projectId, credentialId ?? null, accessedBy, action]
+      `INSERT INTO credential_access_log
+         (project_id, credential_id, accessed_by, action, key_name, client, ip, user_agent)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        projectId,
+        context.credentialId ?? null,
+        accessedBy,
+        action,
+        context.keyName ?? null,
+        context.client ?? null,
+        context.ip ?? null,
+        // Only ever used to distinguish devices; the column is 255.
+        context.userAgent ? context.userAgent.slice(0, 255) : null,
+      ]
     )
   } catch (error) {
     // Audit failures must not break the primary operation.
     console.error('Failed to write credential access log:', error)
   }
+}
+
+export interface AccessLogEntry {
+  id: number
+  projectId: string
+  credentialId: number | null
+  keyName: string | null
+  accessedBy: string
+  accessedByName?: string | null
+  action: AccessAction
+  client: AccessClient | null
+  ip: string | null
+  userAgent: string | null
+  createdAt: string
+}
+
+/** Who looked at this project's secrets, newest first. */
+export async function listCredentialAccessLog(
+  projectId: string,
+  limit = 100
+): Promise<AccessLogEntry[]> {
+  type LogRow = {
+    id: number
+    project_id: string
+    credential_id: number | null
+    key_name: string | null
+    accessed_by: string
+    accessed_by_name: string | null
+    action: string
+    client: string | null
+    ip: string | null
+    user_agent: string | null
+    created_at: string
+  }
+
+  let rows: LogRow[]
+  try {
+    rows = await query<LogRow[]>(
+      `SELECT l.id, l.project_id, l.credential_id, l.key_name, l.accessed_by,
+              u.name AS accessed_by_name, l.action, l.client, l.ip, l.user_agent, l.created_at
+         FROM credential_access_log l
+         LEFT JOIN users u ON u.employee_id = l.accessed_by
+        WHERE l.project_id = $1
+        ORDER BY l.created_at DESC
+        LIMIT $2`,
+      [projectId, Math.min(Math.max(limit, 1), 500)]
+    )
+  } catch (error) {
+    // 42703 = undefined_column: migration 065 has not run yet. Fall back to the
+    // columns that have always existed rather than failing the page.
+    if ((error as { code?: string })?.code !== '42703') throw error
+    console.warn('credential_access_log detail columns are missing — run migration 065')
+    const legacy = await query<Array<Omit<LogRow, 'key_name' | 'client' | 'ip' | 'user_agent'>>>(
+      `SELECT l.id, l.project_id, l.credential_id, l.accessed_by,
+              u.name AS accessed_by_name, l.action, l.created_at
+         FROM credential_access_log l
+         LEFT JOIN users u ON u.employee_id = l.accessed_by
+        WHERE l.project_id = $1
+        ORDER BY l.created_at DESC
+        LIMIT $2`,
+      [projectId, Math.min(Math.max(limit, 1), 500)]
+    )
+    rows = legacy.map((r) => ({ ...r, key_name: null, client: null, ip: null, user_agent: null }))
+  }
+  return rows.map((r) => ({
+    id: r.id,
+    projectId: r.project_id,
+    credentialId: r.credential_id,
+    keyName: r.key_name,
+    accessedBy: r.accessed_by,
+    accessedByName: r.accessed_by_name,
+    action: r.action as AccessAction,
+    client: (r.client as AccessClient) ?? null,
+    ip: r.ip,
+    userAgent: r.user_agent,
+    createdAt: r.created_at,
+  }))
+}
+
+/**
+ * How many times this person has revealed a secret in the last `windowMinutes`.
+ *
+ * A reveal is the one action that puts a plaintext secret on a screen, so it is
+ * worth rate limiting: without it, a stolen session can walk every key in a
+ * project in seconds and the only trace is a burst of audit rows.
+ */
+export async function countRecentReveals(
+  accessedBy: string,
+  windowMinutes: number
+): Promise<number> {
+  const rows = await query<Array<{ n: number }>>(
+    `SELECT count(*)::int AS n FROM credential_access_log
+      WHERE accessed_by = $1
+        AND action IN ('reveal', 'export')
+        AND created_at > NOW() - ($2 || ' minutes')::interval`,
+    [accessedBy, String(windowMinutes)]
+  )
+  return rows[0]?.n ?? 0
+}
+
+/** One env secret's decrypted value, or null when the key does not exist. */
+export async function getEnvSecretValue(
+  projectId: string,
+  environment: SecretEnvironment,
+  key: string
+): Promise<{ key: string; value: string; updatedAt: string } | null> {
+  const rows = await query<EnvRow[]>(
+    `SELECT * FROM project_env_secrets
+      WHERE project_id = $1 AND environment = $2 AND key = $3`,
+    [projectId, environment, key]
+  )
+  const row = rows[0]
+  if (!row) return null
+  return { key: row.key, value: decryptSecret(row.value_encrypted), updatedAt: row.updated_at }
 }
