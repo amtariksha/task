@@ -49,6 +49,7 @@ import {
   approveRequirement,
   rejectRequirement,
   updateRequirementStatus,
+  deleteRequirement,
   rollbackRequirementToVersion,
   createDevItemFromRequirement,
   Requirement,
@@ -68,6 +69,7 @@ import {
 } from '../utils/requirementHelpers'
 import {
   canCreateDevItem,
+  canDeleteRequirement,
   canReviewRequirement,
   canSubmitForReview,
   lifecycleStatusOptions,
@@ -472,7 +474,22 @@ export default function RequirementDetailScreen() {
     }
   }
 
-  const handleRestoreRevision = async (rev: RequirementSectionRevision) => {
+  const handleRestoreRevision = (rev: RequirementSectionRevision) => {
+    if (!historySection) return
+    // Restoring overwrites whatever the section says now and adds a revision of
+    // its own — and it was one tap in a scrolling list of near-identical rows.
+    Alert.alert(
+      'Restore this version?',
+      `"${historySection.heading}" will be replaced with ${rev.editorName}'s version from ` +
+        `${formatDateTimeIST(rev.createdAt)}. The current text becomes a revision you can restore back to.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Restore', style: 'destructive', onPress: () => { void performRestoreRevision(rev) } },
+      ]
+    )
+  }
+
+  const performRestoreRevision = async (rev: RequirementSectionRevision) => {
     if (!historySection) return
     try {
       setRestoringRevId(rev.id)
@@ -484,6 +501,37 @@ export default function RequirementDetailScreen() {
     } finally {
       setRestoringRevId(null)
     }
+  }
+
+  /**
+   * Delete the whole requirement. The server allows the author or a privileged
+   * role (requirement-resolvers.deleteRequirement); there was no way to do it from
+   * mobile at all, so an accidentally created requirement was permanent here.
+   */
+  const handleDeleteRequirement = () => {
+    if (!requirement) return
+    Alert.alert(
+      'Delete this requirement?',
+      `${requirement.requirementId} "${requirement.title}" and all its sections will be removed. ` +
+        'This cannot be undone from the app.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void (async () => {
+              try {
+                await deleteRequirement(requirementId)
+                navigation.goBack()
+              } catch (err) {
+                handleError(err)
+              }
+            })()
+          },
+        },
+      ]
+    )
   }
 
   // --- DEV handoff ---
@@ -579,6 +627,7 @@ export default function RequirementDetailScreen() {
   const lifecycleOptions = canEdit ? lifecycleStatusOptions(requirement, actor) : []
   // DEV items come from an Approved requirement only.
   const canCreateDev = canEdit && canCreateDevItem(requirement.status)
+  const canDelete = canEdit && canDeleteRequirement(requirement, actor)
 
   return (
     <View style={styles.container}>
@@ -595,6 +644,15 @@ export default function RequirementDetailScreen() {
               <Text style={styles.title}>{requirement.title}</Text>
               {canEdit ? (
                 <IconButton icon="pencil" size={22} onPress={openEditHeader} style={{ margin: 0 }} />
+              ) : null}
+              {canDelete ? (
+                <IconButton
+                  icon="trash-can-outline"
+                  size={22}
+                  iconColor={colors.error}
+                  onPress={handleDeleteRequirement}
+                  style={{ margin: 0 }}
+                />
               ) : null}
             </View>
 

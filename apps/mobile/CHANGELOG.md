@@ -16,7 +16,27 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   on bug detail screens when populated
 - Sign in with email address in addition to employee ID
 
+### Added
+- **Project secrets** (read-only): credential names and environment keys per
+  project, revealing one value at a time behind a fingerprint or face
+  prompt. Screenshots are blocked on that screen, a revealed value hides
+  after 30 seconds and when the app goes to the background, and copying
+  clears the clipboard after 45 seconds. Adding and editing stay on the web.
+- Tapping a notification now opens what it refers to, the same as tapping
+  the push
+- The company you are working in is shown in the drawer, when you belong to
+  more than one
+- Your role in a project is shown on the members list, and a project
+  manager can change it
+- Requirements can be deleted by their author
+
 ### Changed
+- The security PIN is now optional. Nothing is forced at sign-in; set it up,
+  change it or turn it off from Settings
+- Freezing a requirements version, and restoring an older section, now ask
+  first — both are hard to undo
+- Requirement search covers the whole project, not only the rows already
+  loaded
 - App branded as **Karmayog** (was "JSR Task Management")
 - New "Energetic Startup" theme: Vibrant Purple primary, dark mode by
   default
