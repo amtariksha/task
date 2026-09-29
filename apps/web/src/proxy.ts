@@ -17,9 +17,11 @@ import jwt from 'jsonwebtoken'
  * still do the finer-grained work (role, company and ownership checks) — this
  * is a floor, not a replacement for them.
  *
- * Runs on the Node.js runtime because jsonwebtoken needs node:crypto.
+ * This file was `middleware.ts` until Next 16.3 deprecated that convention.
+ * `proxy` runs on the Node.js runtime by default, which is what jsonwebtoken
+ * needs for node:crypto — the explicit `export const runtime = 'nodejs'` the old
+ * file carried is therefore redundant here, and the codemod dropped it.
  */
-export const runtime = 'nodejs'
 
 /** Routes that must work without a session. Keep this list short and obvious. */
 const PUBLIC_API_ROUTES = new Set([
@@ -89,7 +91,7 @@ function withCors(response: NextResponse): NextResponse {
   return response
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Preflight carries no credentials — answer it before the auth check.

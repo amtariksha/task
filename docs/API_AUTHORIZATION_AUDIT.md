@@ -7,7 +7,7 @@ rather than assumed safe.
 ## Two different questions
 
 **Authentication** — is there a valid session? Handled centrally by
-`apps/web/src/middleware.ts`, which is **fail-closed**: everything under `/api`
+`apps/web/src/proxy.ts`, which is **fail-closed**: everything under `/api`
 requires a valid JWT unless it appears in a short allowlist. Adding a new route
 gets you this for free.
 
