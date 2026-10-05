@@ -4,11 +4,12 @@
  * Updated: GraphQL with REST fallback
  */
 
-import { get, put, ApiResponse } from './apiClient'
+import { get, post, put, ApiResponse } from './apiClient'
 import { API_ENDPOINTS } from '../config/api'
 import { executeGraphQLWithFallback } from './graphqlClient'
 import { QUERIES } from './graphqlQueries'
 import { ReleaseChecklistTemplate } from '../types'
+import { unwrapApiBody, type ApiResult } from '../utils/apiEnvelope'
 
 export interface Project {
   projectId: string
@@ -56,6 +57,29 @@ export const getAllProjects = async (): Promise<ApiResponse<Project[]>> => {
     }
     return response
   })
+}
+
+export interface CreateProjectInput {
+  projectName: string
+  parentProjectId?: string | null
+  description?: string | null
+  status?: 'Active' | 'Inactive'
+  createdBy?: string
+}
+
+/**
+ * Create a project, or a sub-project when parentProjectId is set. A 201 carries
+ * the bare created project, which read as `success` undefined and made the
+ * screens report a failure for a project that had been created.
+ */
+export const createProject = async (input: CreateProjectInput): Promise<ApiResult<Project>> => {
+  const result = unwrapApiBody<Project>(await post(API_ENDPOINTS.PROJECTS, input), 'Failed to create project')
+  // Every real 201 carries the new id. Anything else (say, a gateway's JSON
+  // error page) must not be reported as a project that now exists.
+  if (result.success && typeof result.data?.projectId !== 'string') {
+    return { success: false, error: 'Failed to create project' }
+  }
+  return result
 }
 
 /**

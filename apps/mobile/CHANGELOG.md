@@ -13,6 +13,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - An expired session on the Feed, Notifications, Attendance or Start screens
   now returns you to the sign-in screen instead of leaving them failing to load
+- Adding a project or a sub-project no longer says it failed when the project
+  was created, which led to creating it twice
 
 ---
 
