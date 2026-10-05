@@ -29,10 +29,9 @@ const nextConfig = {
     // optimizeCss: true,
   },
 
-  // Environment variables validation
-  env: {
-    JWT_SECRET: process.env.JWT_SECRET,
-  },
+  // Do not add secrets to an `env` block: Next inlines those values into every
+  // bundle that references them, client bundles included. Server code reads
+  // JWT_SECRET from process.env at runtime.
 
   // API routes configuration
   async headers() {

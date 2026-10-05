@@ -357,50 +357,6 @@ export async function canApproveFor(approverId: string, employeeId: string): Pro
   }
 }
 
-// ============ JWT Token Functions (Server-side) ============
-// These functions are used for mobile app authentication
-
-export interface TokenPayload {
-  employeeId: string
-  role: string
-  name: string
-}
-
-export function verifyToken(token: string): TokenPayload | null {
-  try {
-    // Import jwt only on server-side
-    if (typeof window !== 'undefined') {
-      // Client-side - cannot verify JWT
-      return null
-    }
-
-    // Server-side JWT verification
-    const secret = process.env.JWT_SECRET
-    if (!secret || secret.length < 16) {
-      throw new Error('JWT_SECRET is not configured')
-    }
-    const jwt = require('jsonwebtoken')
-    const decoded = jwt.verify(token, secret)
-
-    return decoded as TokenPayload
-  } catch (error) {
-    console.error('Failed to verify token:', error)
-    return null
-  }
-}
-
-export function getAuthUser(request: Request): TokenPayload | null {
-  try {
-    const authHeader = request.headers.get('Authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return null
-    }
-
-    const token = authHeader.replace('Bearer ', '')
-    return verifyToken(token)
-  } catch (error) {
-    console.error('Failed to get auth user:', error)
-    return null
-  }
-}
+// JWT verification is server-only and lives in ./auth-server (verifyToken,
+// getAuthUser). Keep it out of this 'use client' module so the signing key can
+// never be pulled into a browser bundle.
