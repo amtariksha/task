@@ -10,6 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- An expired session on the Feed, Notifications, Attendance or Start screens
+  now returns you to the sign-in screen instead of leaving them failing to load
+
 ---
 
 ## [1.3.0] — 2026-09-29

@@ -9,11 +9,12 @@
  */
 
 import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client'
-import { setContext } from '@apollo/client/link/context'
-import { onError } from '@apollo/client/link/error'
-import * as SecureStore from 'expo-secure-store'
-import { deleteSecure, SECURE_KEYS } from '../utils/secureStorage'
-import { triggerUnauthorized } from '../utils/authEvents'
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client/errors'
+import { SetContextLink } from '@apollo/client/link/context'
+import { ErrorLink } from '@apollo/client/link/error'
+import { getUserToken } from '../utils/secureStorage'
+import { isUnauthenticatedGraphQLError } from '../utils/authErrors'
+import { handleAuthRejection } from '../utils/sessionExpiry'
 import { CachePersistor } from 'apollo3-cache-persist'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { logger, logApiRequest, logApiResponse, logApiError } from '../utils/debugLogger'
@@ -38,70 +39,51 @@ const httpLink = createHttpLink({
 /**
  * Auth Link - adds JWT token to request headers
  */
-const authLink = setContext(async (_, { headers }) => {
-  try {
-    // Get token from SecureStore
-    const token = await SecureStore.getItemAsync('userToken')
-    
-    return {
-      headers: {
-        ...headers,
-        authorization: token ? `Bearer ${token}` : '',
-      },
-    }
-  } catch (error) {
-    console.error('Failed to get auth token:', error)
-    return { headers }
+const authLink = new SetContextLink(async (prevContext) => {
+  const token = await getUserToken()
+  return {
+    headers: {
+      ...prevContext.headers,
+      authorization: token ? `Bearer ${token}` : '',
+    },
+    // Read back by errorLink: a refusal only ends the session if it refused the stored token.
+    authToken: token,
   }
 })
 
 /**
- * Error Link - handles GraphQL and network errors
+ * Error Link - logs every GraphQL and network error to the console and the
+ * in-app debug logger, and ends the session when the server refuses the token.
+ *
+ * Apollo 4 passes a single `error`. This used to destructure Apollo 3's
+ * `graphQLErrors` / `networkError` through an `as any`, which were always
+ * undefined, so from the 4.0 upgrade nothing here logged or signed anyone out.
  */
-const errorLink = onError((errorResponse) => {
-  const { graphQLErrors, networkError, operation } = errorResponse as any
+const errorLink = new ErrorLink(({ error, operation }) => {
+  const { operationName } = operation
+  const { authToken } = operation.getContext()
+  const sentToken = typeof authToken === 'string' ? authToken : null
+  const source = operationName || 'Unnamed GraphQL operation'
 
-  if (graphQLErrors) {
-    graphQLErrors.forEach((error: any) => {
-      const { message, locations, path } = error
-      const errorMsg = `[GraphQL error]: Message: ${message}, Location: ${JSON.stringify(locations)}, Path: ${path}`
-      console.error(errorMsg)
-      logger.error('GraphQL', errorMsg, { operation: operation.operationName })
-
-      // Auth failures are returned as GraphQL errors with HTTP 200 (not a 401
-      // networkError), so detect them here and sign the user out. Only treat
-      // UNAUTHENTICATED as a session-expiry — FORBIDDEN means authenticated but
-      // lacking permission, which must NOT log the user out.
-      const code = error?.extensions?.code
-      if (code === 'UNAUTHENTICATED' || (typeof message === 'string' && message.includes('UNAUTHENTICATED'))) {
-        console.log('GraphQL auth error - clearing token and signing out')
-        logger.warn('Auth', 'GraphQL UNAUTHENTICATED', { operation: operation?.operationName })
-        deleteSecure(SECURE_KEYS.USER_TOKEN).catch(() => {})
-        triggerUnauthorized()
-      }
+  if (CombinedGraphQLErrors.is(error)) {
+    error.errors.forEach(({ message, locations, path }) => {
+      logger.error(
+        'GraphQL',
+        `[GraphQL error]: Message: ${message}, Location: ${JSON.stringify(locations)}, Path: ${path}`,
+        { operation: operationName }
+      )
     })
+    // Auth failures arrive as GraphQL errors with HTTP 200, not as a 401.
+    if (error.errors.some(isUnauthenticatedGraphQLError)) {
+      void handleAuthRejection(sentToken, source)
+    }
+    return
   }
 
-  if (networkError) {
-    const errorMsg = `[Network error]: ${networkError}`
-    console.error(errorMsg)
-    logger.error('Network', errorMsg, {
-      operation: operation.operationName,
-      error: networkError
-    })
-
-    // Handle specific network errors
-    if ('statusCode' in networkError) {
-      const statusCode = (networkError as any).statusCode
-
-      if (statusCode === 401) {
-        // Unauthorized - token expired or invalid
-        console.log('Token expired or invalid - clearing token and signing out')
-        logger.warn('Auth', 'Token expired or invalid', { statusCode })
-        deleteSecure(SECURE_KEYS.USER_TOKEN).catch(() => {})
-        triggerUnauthorized()
-      }
-    }
+  const statusCode = ServerError.is(error) ? error.statusCode : undefined
+  logger.error('Network', `[Network error]: ${error.message}`, { operation: operationName, statusCode })
+  if (statusCode === 401) {
+    void handleAuthRejection(sentToken, source)
   }
 })
 
