@@ -6,6 +6,7 @@ import {
   buildProjectTasksQuery,
   buildTaskListQuery,
   buildUserBugsQuery,
+  buildUserListQuery,
   buildUserTasksQuery,
   isInCompanyScope,
   listBugs,
@@ -14,7 +15,9 @@ import {
   listTasks,
   listTasksOfProject,
   listTasksOfUser,
+  listUsers,
   projectListScope,
+  userListScope,
   workItemListScope,
 } from '../list-scope.ts'
 
@@ -288,6 +291,7 @@ describe('list functions run the scoped SQL through the injected query', () => {
     ['listTasksOfUser', (deps) => listTasksOfUser(comp002Member, 'AM-0002', deps), buildUserTasksQuery(comp002Member, 'AM-0002')],
     ['listBugsOfUser', (deps) => listBugsOfUser(comp002Member, 'AM-0002', deps), buildUserBugsQuery(comp002Member, 'AM-0002')],
     ['listTasksOfProject', (deps) => listTasksOfProject(comp002Member, 'PRJ-001', deps), buildProjectTasksQuery(comp002Member, 'PRJ-001')],
+    ['listUsers', (deps) => listUsers(comp002Member, deps), buildUserListQuery(comp002Member)],
   ]
 
   for (const [name, call, expected] of cases) {
@@ -330,5 +334,41 @@ describe('listProjects', () => {
     assert.deepEqual(deps.calls, [
       { text: 'SELECT * FROM projects WHERE deleted_at IS NULL ORDER BY project_name ASC', values: [] },
     ])
+  })
+})
+
+describe('users — mirrors GET /api/users', () => {
+  test('members and company admins are scoped to the active company', () => {
+    assert.deepEqual(userListScope(comp001Member), { all: false, companyId: 'COMP-001' })
+    assert.deepEqual(userListScope(comp002Member), { all: false, companyId: 'COMP-002' })
+    assert.deepEqual(userListScope(companyAdmin), { all: false, companyId: 'COMP-001' })
+  })
+
+  test('a platform admin and a token without a company keep the wide view', () => {
+    assert.deepEqual(userListScope(platformAdmin), { all: true })
+    assert.deepEqual(userListScope(pre062Token), { all: true })
+  })
+
+  test('a scoped list joins the session company\'s memberships and binds the company', () => {
+    const built = buildUserListQuery(comp002Member)
+    assert.match(built.text, /JOIN user_companies uc ON uc\.employee_id = u\.employee_id/)
+    assert.equal(valueBoundAfter(built, 'uc.company_id = '), 'COMP-002')
+    assert.ok(!built.text.includes('COMP-002'))
+    assertParamsLineUp(built)
+  })
+
+  test('inactive users stay in the list, active first, as the resolver always returned them', () => {
+    const built = buildUserListQuery(comp001Member)
+    const where = built.text.slice(built.text.indexOf('WHERE'), built.text.indexOf('ORDER BY'))
+    assert.doesNotMatch(where, /status/)
+    assert.match(built.text, /ORDER BY CASE WHEN u\.status = 'active' THEN 0 ELSE 1 END, u\.name ASC$/)
+  })
+
+  test('the wide view is the unscoped query the resolver always ran', () => {
+    assert.deepEqual(buildUserListQuery(platformAdmin), {
+      text: "SELECT * FROM users ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name ASC",
+      values: [],
+    })
+    assert.deepEqual(buildUserListQuery(pre062Token), buildUserListQuery(platformAdmin))
   })
 })

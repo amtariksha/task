@@ -28,6 +28,7 @@ import {
   listTasks,
   listTasksOfProject,
   listTasksOfUser,
+  listUsers,
   type ListScopeDeps,
 } from '@/lib/tenancy/list-scope'
 import { readBug, readTask, type BugReadDeps, type TaskReadDeps } from '@/lib/tenancy/item-access'
@@ -399,10 +400,8 @@ export const resolvers = {
 
     users: async (_: any, __: any, { user }: any) => {
       if (!user) throw new Error('Unauthorized')
-      const result = await getPoolInstance().query(
-        "SELECT * FROM users ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name ASC"
-      )
-      return result.rows || []
+      // Same company test as GET /api/users: platform admins keep every company.
+      return listUsers(user, listScopeDeps())
     },
 
     projects: async (_: any, __: any, { user }: any) => {
@@ -437,7 +436,9 @@ export const resolvers = {
       return result.rows || []
     },
 
-    user: async (_: any, { employeeId }: any) => {
+    user: async (_: any, { employeeId }: any, context: any) => {
+      // Session only, as GET /api/users/[employeeId]: that route has no company check.
+      requireUser(context)
       // The schema arg is `employeeId` and the users PK is `employee_id`
       // (there is no `id` column) — the previous version always errored.
       const result = await getPoolInstance().query('SELECT * FROM users WHERE employee_id = $1', [employeeId])

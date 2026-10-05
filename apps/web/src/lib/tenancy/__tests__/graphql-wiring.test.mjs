@@ -62,6 +62,12 @@ describe('GraphQL list resolvers go through lib/tenancy/list-scope', () => {
     }
   })
 
+  test('users delegates to its scoped list function', () => {
+    assert.match(
+      resolversSource,
+      /users: async \(_: any, __: any, \{ user \}: any\) => \{\s+if \(!user\) throw[^\n]*\n[^\n]*\n\s+return listUsers\(user, /
+    )
+  })
 })
 
 /** One resolver's source, from its signature to the brace that closes it. */
@@ -89,6 +95,12 @@ describe('GraphQL single-item reads go through lib/tenancy/item-access', () => {
 
   test('no resolver runs its own project-membership gate any more', () => {
     assert.doesNotMatch(resolversSource, /FROM project_users WHERE employee_id = \$1 AND project_id = \$2/)
+  })
+
+  test('user(employeeId) requires a session before it reads', () => {
+    const user = resolverBody(resolversSource, 'user: async (_: any, { employeeId }: any, context: any) => {')
+    assert.ok(user.indexOf('requireUser(context)') > 0, 'user(employeeId) does not call requireUser')
+    assert.ok(user.indexOf('requireUser(context)') < user.indexOf('.query('), 'user(employeeId) reads before requireUser')
   })
 
   test('requirements check the tenant boundary, with no global-role shortcut', () => {
