@@ -712,6 +712,14 @@ function AppContent() {
   // token. The ref is reassigned every render (see below, after authContext).
   const signOutRef = useRef<() => void>(() => {})
 
+  // True while no session is open: before the first sign-in, and from the moment a sign-out
+  // starts. Several in-flight requests can be refused on the same dead token, and a forced
+  // sign-out can overlap one the user started; only the first may run the cleanup.
+  const sessionClosedRef = useRef(true)
+  useEffect(() => {
+    sessionClosedRef.current = !state.userToken
+  }, [state.userToken])
+
   // Register global 401 unauthorized handler to trigger signOut (via the ref).
   useEffect(() => {
     setOnUnauthorized(() => {
@@ -1024,12 +1032,15 @@ function AppContent() {
         }
       },
       signOut: async () => {
+        if (sessionClosedRef.current) return
+        sessionClosedRef.current = true
         try {
-          // Unregister push token from backend
+          // Unregister push token from backend. A forced sign-out has already cleared the
+          // session token, and the call could only be refused.
           if (pushToken) {
             try {
               const userData = await getUserData()
-              if (userData?.employeeId) {
+              if (userData?.employeeId && (await getUserToken())) {
                 await apolloClient.mutate({
                   mutation: UNREGISTER_PUSH_TOKEN,
                   variables: {
