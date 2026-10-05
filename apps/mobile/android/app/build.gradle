@@ -150,6 +150,28 @@ android {
     }
 }
 
+// The release config above silently falls back to debug.keystore, which is the
+// public React Native template key — anyone can sign an "update" for an app
+// signed with it. EAS Build injects its own release signing (eas-build.gradle)
+// after this file's android {} block, so check the resolved config once the task
+// graph is known rather than checking the RELEASE_* vars.
+gradle.taskGraph.whenReady { graph ->
+    def packagesRelease = graph.allTasks.any { task ->
+        task.project == project && task.name in ['packageRelease', 'signReleaseBundle']
+    }
+    if (!packagesRelease || findProperty('allowDebugSignedRelease') == 'true') {
+        return
+    }
+    def releaseSigning = android.buildTypes.release.signingConfig
+    if (releaseSigning?.storeFile == null || releaseSigning.keyAlias == android.signingConfigs.debug.keyAlias) {
+        throw new GradleException(
+            "Release build would be signed with the debug keystore. Set RELEASE_STORE_FILE, " +
+            "RELEASE_STORE_PASSWORD, RELEASE_KEY_ALIAS and RELEASE_KEY_PASSWORD, or build with EAS. " +
+            "For a local build that will never be distributed, pass -PallowDebugSignedRelease=true."
+        )
+    }
+}
+
 // Apply static values from `gradle.properties` to the `android.packagingOptions`
 // Accepts values in comma delimited lists, example:
 // android.packagingOptions.pickFirsts=/LICENSE,**/picasa.ini
