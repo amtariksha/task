@@ -8,6 +8,8 @@ import { emailService } from '@/lib/email/service'
 import { getUserProjectIds } from '@/lib/db/project-users'
 import { createNotification } from '@/lib/notification-helper'
 import { canEditWorkItem, isSameCompany } from '@/lib/authz'
+// Modify rule shared with the GraphQL updateTask / deleteTask mutations.
+import { canModifyTask } from '@/lib/tasks/task-access'
 
 /**
  * Check whether an authenticated user can access a specific task.
@@ -29,45 +31,6 @@ async function canAccessTask(
   if (task.projectId) {
     const accessibleProjectIds = await getUserProjectIds(authUser.employeeId)
     if (accessibleProjectIds.includes(task.projectId)) return true
-  }
-  return false
-}
-
-/**
- * May this user MODIFY the task? Stricter than canAccessTask, which governs
- * reading only — project membership is enough to view a task, not to change it.
- *
- * Delegates to lib/authz.canEditWorkItem, so a project manager or team leader,
- * or anyone above an assignee in the reporting chain (at any depth), qualifies.
- */
-async function canModifyTask(
-  authUser: { employeeId: string; role: string; companyId?: string | null; isPlatformAdmin?: boolean },
-  task: any
-): Promise<boolean> {
-  const owner = Array.isArray(task?.assignedTo)
-    ? task.assignedTo[0]
-    : task?.assignedTo || task?.assignedBy || null
-
-  if (await canEditWorkItem(authUser, {
-    projectId: task?.projectId ?? null,
-    ownerEmployeeId: owner,
-    companyId: task?.companyId ?? null,
-  })) {
-    return true
-  }
-
-  // Multi-assignee tasks: any assignee may edit, and so may their manager.
-  if (Array.isArray(task?.assignedTo)) {
-    for (const assignee of task.assignedTo) {
-      if (assignee === authUser.employeeId) return true
-      if (await canEditWorkItem(authUser, {
-        projectId: task?.projectId ?? null,
-        ownerEmployeeId: assignee,
-        companyId: task?.companyId ?? null,
-      })) {
-        return true
-      }
-    }
   }
   return false
 }
@@ -150,7 +113,7 @@ export async function PUT(
     if (!currentTask) {
       return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
     }
-    if (!(await canModifyTask(authUser, currentTask))) {
+    if (!(await canModifyTask(authUser, currentTask, { canEditWorkItem }))) {
       return NextResponse.json(
         { success: false, error: 'You do not have permission to edit this task.' },
         { status: 403 }
@@ -405,7 +368,7 @@ export async function DELETE(
     if (!taskToDelete) {
       return NextResponse.json({ success: false, error: 'Task not found' }, { status: 404 })
     }
-    if (!(await canModifyTask(user, taskToDelete))) {
+    if (!(await canModifyTask(user, taskToDelete, { canEditWorkItem }))) {
       return NextResponse.json(
         { success: false, error: 'You do not have permission to delete this task.' },
         { status: 403 }
