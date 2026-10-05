@@ -10,6 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.0] — 2026-10-05
+
 ### Added
 - **Brain dump** (founder accounts only): Start → ⋮ → Brain dump. Type or
   dictate one thought per line, check the list, and save it all as threads

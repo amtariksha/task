@@ -1,6 +1,6 @@
 # Karmayog — Founder Start: User Manual
 
-**Version:** 1.2  
+**Version:** 1.2.1  
 **Last Updated:** 2026-10-05  
 **For:** Founder (AM-0001) and platform admins  
 **App version:** mobile 1.3.0 (build 21)
@@ -8,6 +8,7 @@
 ---
 
 ## Changelog
+- **2026-10-05 (1.2.1)**: What the earlier entries called "the next mobile build" is now named: mobile 1.4.0 (build 22).
 - **2026-10-05 (1.2)**: Updated for mobile 1.3.0 (build 21) and the current web app. New sections: [What's New in 1.3.0](#whats-new-in-130), [Security PIN](#security-pin), [Getting Everything Out of Your Head](#getting-everything-out-of-your-head), [Start is missing](#start-is-missing) (a step-by-step check) and [Companies, Roles, Secrets and Approvals](#companies-roles-secrets-and-approvals). Changed for 1.3.0: the rank screen asks before discarding, close-out text stops at 2000 characters, the Notifications row opens Start, the security PIN is optional, and a company switch reloads Start. Corrections: the in-app notification title, what an expired session does on mobile (the automatic sign-out on Start is not in 1.3.0), the migration 065 note, the cron check now in `proxy.ts`, and code paths.
 - **2026-09-17 (1.1)**: Review corrections: weekday names in the examples, parked-thread labels, thread deletion, deleted projects, push timing and failure checks, nested repos in the machine scripts, token setup, first-morning checklist, adding a founder and calling the API.
 - **2026-09-17**: First version of the Founder Start manual. Covers the mobile app (1.2.0, build 20), the web page at `/start`, the 09:00 IST push, the scripts on the founder's machine and admin setup.
@@ -48,11 +49,11 @@ Mobile 1.3.0 (build 21) is the current app. The web Start page is unchanged sinc
 | The security PIN is optional | Sign-in no longer makes you set up a PIN. If you have set one, the lock screen asks for it right after you sign in. Without a PIN, the app never locks, and coming back to it leaves you where you were, so Start comes back on its own only on a new IST day or when the app restarts. Any PIN from an older version is deleted on the first launch. See [Security PIN](#security-pin). |
 | Switching company reloads Start | A company switch reloads every screen and lands you on Start. Start shows the same threads in every company. |
 
-### Not in 1.3.0
+### Arriving in 1.4.0
 
-These are fixed in the code but arrive only with the next mobile build:
+These are not in 1.3.0. They arrive with mobile 1.4.0 (build 22):
 
-- **⋮** → **Brain dump** (new): type or dictate everything in your head, one thought per line, check it and save it all as threads in one go. The text is kept as a draft until it is saved. See [Brain dump](#brain-dump-next-mobile-build).
+- **⋮** → **Brain dump** (new): type or dictate everything in your head, one thought per line, check it and save it all as threads in one go. The text is kept as a draft until it is saved. See [Brain dump](#brain-dump-mobile-140).
 - An expired session on Start, Feed, Notifications or Attendance signs you out on its own. In 1.3.0 those screens just fail to load, so tap **Logout** in the drawer and sign in again.
 - A failed or empty founder check is recorded in **Debug Menu** → **Logs**, and the server's "you are a founder" answer is kept even when the phone cannot store it.
 - A sign-out happens only when the token the app currently holds is refused, and it runs only once.
@@ -503,7 +504,7 @@ Do not use **Add thread** for a list. Each thread it makes has no next action, s
 
 You need mobile 1.2.0 or later (1.3.0 is current). Use the phone for threads only:
 
-- **⋮** → **Brain dump** (next mobile build, not in 1.3.0): type or dictate the whole list, check it and save it in one go. See [Brain dump](#brain-dump-next-mobile-build) below.
+- **⋮** → **Brain dump** (mobile 1.4.0 and later): type or dictate the whole list, check it and save it in one go. See [Brain dump](#brain-dump-mobile-140) below.
 - **Close-out** (bottom right of Start) → **+ new** → type under **New thread** → **Add** → type the **Next action** → **+ new** for the next one → **Save (N)**. You see **Close-out saved**. It needs a connection.
 - **⋮** → **Rank threads** → tap the rank button on each **Unranked** row in priority order → **Save**.
 - **⋮** → **Add thread** closes after each thread and sets no next action. Use the close-out instead.
@@ -513,9 +514,9 @@ Create projects and tasks on the web. Mobile 1.3.0 has two bugs here:
 - **Add New Project** shows **Failed to create project** even when the project was created. Check **Projects** before trying again, or you get a duplicate.
 - The **Project \*** list in **Create Task** shows only five built-in names (**dsn**, **amtariksha**, **task management**, **swarg**, **other**) instead of your projects. They are not real projects: a task filed under one of them belongs to no project. Do not use them.
 
-#### Brain dump (next mobile build)
+#### Brain dump (mobile 1.4.0)
 
-Not in 1.3.0: it arrives with the next mobile build. Like the close-out, it makes threads only, never projects or tasks.
+New in mobile 1.4.0; not in 1.3.0. Like the close-out, it makes threads only, never projects or tasks.
 
 1. On Start, tap **⋮** → **Brain dump**.
 2. **Write.** Type or dictate one thought per line. To give a thought its next action, put it after ` -> ` or ` → `, for example `Hiring -> Post job ad`. On a line with no arrow, `: ` works too, as in `Investor deck: Update traction slide`. An arrow always wins over a colon, so `Re: pricing -> call Ravi` gives the label **Re: pricing**, and only the first arrow splits. Without an arrow, the first `: ` splits, so `Re: pricing` gives the label **Re** (fix it in the next step). A colon with no space after it, as in `10:30` or `https://…`, does not split. Extra spaces inside a label are dropped. Bullets at the start of a line (`- `, `* `, `• `, `1. `, `1) `) and blank lines are ignored. When dictating, say "new line" between thoughts. Under the box you see the count (**12 thoughts**) and **Saving draft…** or **Draft saved**.
@@ -844,7 +845,7 @@ Work through these in order and stop at the first one that explains it.
    | An error in red with **Retry**, and no **START · …** heading | The founder check failed, for example no network. The red text is the error itself, not a fixed message. | Click **Retry**. If it keeps failing, ask an admin to check the Vercel logs. |
    | The **START · …** heading and toolbar, with an error in red and **Retry** below (for example **Could not load Start.**) | You are a founder, but Start's data did not load | Click **Retry** |
 
-4. **Let the phone check again.** The phone asks the server whether you are a founder at sign-in and each time you come back to the app. In 1.3.0, if that check fails (no connection, a server error, or the phone cannot save the answer), the app quietly keeps its stored answer. On a fresh install, or after a **Logout**, that answer is "not a founder", so Start stays hidden. In 1.3.0 a network or server failure is not recorded anywhere, and nothing reaches **Debug Menu** → **Logs**. A failed save shows only in the Android system log (`adb logcat`: `Failed to save data for key founder_flag`). The next mobile build writes every failure to **Debug Menu** → **Logs**. With a working connection, switch to another app and back. If **Start** still does not appear, tap **Logout** in the drawer and sign in again.
+4. **Let the phone check again.** The phone asks the server whether you are a founder at sign-in and each time you come back to the app. In 1.3.0, if that check fails (no connection, a server error, or the phone cannot save the answer), the app quietly keeps its stored answer. On a fresh install, or after a **Logout**, that answer is "not a founder", so Start stays hidden. In 1.3.0 a network or server failure is not recorded anywhere, and nothing reaches **Debug Menu** → **Logs**. A failed save shows only in the Android system log (`adb logcat`: `Failed to save data for key founder_flag`). Mobile 1.4.0 writes every failure to **Debug Menu** → **Logs**. With a working connection, switch to another app and back. If **Start** still does not appear, tap **Logout** in the drawer and sign in again.
 
 ---
 
