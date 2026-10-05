@@ -15,8 +15,10 @@ import { getUserData } from '../utils/secureStorage'
 import { materialSpacing, materialTypography, materialColors } from '../config/materialTheme'
 import { useResponsive } from '../hooks/useResponsive'
 import apiClient from '../services/apiClient'
+import { createProject } from '../services/projectService'
 import { SearchablePicker } from '../components/SearchablePicker'
 import { canManageProjects as canManageProjectsFn } from '../utils/permissions'
+import { unwrapApiList } from '../utils/apiEnvelope'
 
 interface ProjectNode {
   projectId: string
@@ -80,26 +82,21 @@ export default function ProjectsScreen() {
         setCurrentUser(user)
       }
 
-      // Fetch hierarchy
-      const res = await apiClient.get('/api/projects/hierarchy')
-      if (res && res.success && Array.isArray(res.data)) {
-        setProjects(res.data)
-      } else if (Array.isArray(res)) {
-        setProjects(res)
+      // Both routes answer with a bare array, not { success, data }.
+      const hierarchy = unwrapApiList<ProjectNode>(
+        await apiClient.get('/api/projects/hierarchy'),
+        'Failed to fetch projects'
+      )
+      if (hierarchy.success) {
+        setProjects(hierarchy.data)
       } else {
-        // Fallback or error
-        setError(res?.error || 'Failed to fetch projects')
+        setError(hierarchy.error)
       }
 
-      // Fetch flat list for parent project dropdown selector
-      const flatRes = await apiClient.get('/api/projects')
-      if (flatRes && flatRes.success && Array.isArray(flatRes.data)) {
-        // Filter out subprojects to only show main projects as potential parents
-        const mainProjects = flatRes.data.filter((p: any) => !p.parentProjectId)
-        setFlatProjectsList(mainProjects)
-      } else if (Array.isArray(flatRes)) {
-        const mainProjects = flatRes.filter((p: any) => !p.parentProjectId)
-        setFlatProjectsList(mainProjects)
+      // Flat list for the parent project selector: main projects only.
+      const flat = unwrapApiList<ProjectNode>(await apiClient.get('/api/projects'), 'Failed to fetch projects')
+      if (flat.success) {
+        setFlatProjectsList(flat.data.filter((p) => !p.parentProjectId))
       }
 
     } catch (err) {
@@ -136,8 +133,8 @@ export default function ProjectsScreen() {
         createdBy: currentUser?.employeeId || 'System'
       }
 
-      const res = await apiClient.post('/api/projects', payload)
-      if (res && res.success) {
+      const res = await createProject(payload)
+      if (res.success) {
         Alert.alert('Success', 'Project created successfully')
         setIsCreateModalOpen(false)
         setNewProjectName('')
@@ -146,7 +143,7 @@ export default function ProjectsScreen() {
         setNewStatus('Active')
         loadData()
       } else {
-        Alert.alert('Error', res?.error || 'Failed to create project')
+        Alert.alert('Error', res.error)
       }
     } catch (err) {
       console.error(err)

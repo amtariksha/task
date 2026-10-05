@@ -25,6 +25,7 @@ import {
   type ProjectRole,
 } from '../utils/permissions'
 import { isActiveCompanyAdmin } from '../services/companyService'
+import { createProject, type CreateProjectInput } from '../services/projectService'
 
 interface SubProject {
   projectId: string
@@ -273,7 +274,7 @@ export default function ProjectDetailsScreen() {
 
     try {
       setIsSubmittingSub(true)
-      const payload = {
+      const payload: CreateProjectInput = {
         projectName: subprojectName.trim(),
         parentProjectId: projectId,
         description: subprojectDesc.trim() || null,
@@ -281,15 +282,15 @@ export default function ProjectDetailsScreen() {
         createdBy: currentUser?.employeeId || 'System',
       }
 
-      const res = await apiClient.post('/api/projects', payload)
-      if (res && res.success) {
+      const res = await createProject(payload)
+      if (res.success) {
         Alert.alert('Success', 'Subproject created successfully')
         setIsAddSubprojectOpen(false)
         setSubprojectName('')
         setSubprojectDesc('')
         loadData()
       } else {
-        Alert.alert('Error', res?.error || 'Failed to create subproject')
+        Alert.alert('Error', res.error)
       }
     } catch (err) {
       console.error(err)
