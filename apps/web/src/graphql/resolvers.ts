@@ -20,6 +20,15 @@ import { format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endO
 import { getCurrentDateTime } from '@/lib/datetime-utils'
 import { signAuthToken } from '@/lib/auth-server'
 import { getDefaultCompanyId, isPlatformAdmin as dbIsPlatformAdmin } from '@/lib/db/companies'
+import {
+  listBugs,
+  listBugsOfUser,
+  listProjects,
+  listTasks,
+  listTasksOfProject,
+  listTasksOfUser,
+  type ListScopeDeps,
+} from '@/lib/tenancy/list-scope'
 
 // Helper to get current IST time as Date object (for logic comparisons)
 const getISTDate = (date: Date = new Date()) => addMinutes(date, 330) // UTC + 5:30
@@ -45,6 +54,17 @@ const getISTDayRangeInUTC = (date: Date) => {
 
 // Lazy-load pool to avoid database connection during build time
 const getPoolInstance = () => getPool()
+
+// Runs the company-scoped list queries (lib/tenancy/list-scope) on the pool.
+// `logLabel` keeps the development query log the top-level lists always wrote.
+const listScopeDeps = (logLabel?: string): ListScopeDeps => ({
+  query: async (text, values) => {
+    const dbStart = logLabel ? logDatabaseQuery(text, values, logLabel) : null
+    const result = await getPoolInstance().query(text, values)
+    if (dbStart) logDatabaseResult(result.rows.length, dbStart.startTime, logLabel)
+    return result.rows
+  },
+})
 
 // DataLoader for batching user queries
 const createUserLoader = () => new DataLoader(async (employeeIds: readonly string[]) => {
@@ -295,73 +315,14 @@ export const resolvers = {
     // gate (it carries the public `login` mutation), so authorization has to be
     // enforced here.
     tasks: async (_: any, filters: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
       const { startTime } = logResolverStart('tasks', filters)
 
       try {
-        // ✅ FIXED: Removed DISTINCT as it conflicts with custom ORDER BY and isn't needed (no joins)
-        let query = 'SELECT * FROM tasks WHERE deleted_at IS NULL'
-        const params: any[] = []
-        let paramIndex = 1
-
-        if (filters.assignedTo && filters.assignedTo.length > 0) {
-          // assigned_to and support are JSONB arrays
-          query += ` AND (
-            assigned_to::jsonb ?| $${paramIndex} OR
-            (CASE WHEN support IS NULL OR support::text = 'null' OR support::text = '' THEN '[]'::jsonb ELSE support::jsonb END) ?| $${paramIndex}
-          )`
-          params.push(filters.assignedTo)
-          paramIndex++
-        }
-        if (filters.assignedBy && filters.assignedBy.length > 0) {
-          query += ` AND assigned_by = ANY($${paramIndex++})`
-          params.push(filters.assignedBy)
-        }
-        if (filters.status && filters.status.length > 0) {
-          query += ` AND status = ANY($${paramIndex++})`
-          params.push(filters.status)
-        }
-        if (filters.priority && filters.priority.length > 0) {
-          query += ` AND priority = ANY($${paramIndex++})`
-          params.push(filters.priority)
-        }
-        if (filters.projectId) {
-          query += ` AND project_id = $${paramIndex++}`
-          params.push(filters.projectId)
-        }
-        if (filters.projectIds && filters.projectIds.length > 0) {
-          query += ` AND project_id = ANY($${paramIndex++})`
-          params.push(filters.projectIds)
-        }
-        if (filters.subprojectId) {
-          query += ` AND subproject_id = $${paramIndex++}`
-          params.push(filters.subprojectId)
-        }
-
-        // ✅ FIXED: Custom sorting - completed/cancelled items at bottom
-        query += ` ORDER BY 
-          CASE 
-            WHEN status IN ('Done', 'Completed', 'Cancelled', 'Cancel') THEN 1 
-            ELSE 0 
-          END,
-          updated_at DESC, task_id DESC`
-
-        // Add pagination
-        if (filters.limit) {
-          query += ` LIMIT $${paramIndex++}`
-          params.push(filters.limit)
-        }
-        if (filters.offset) {
-          query += ` OFFSET $${paramIndex++}`
-          params.push(filters.offset)
-        }
-
-        const dbStart = logDatabaseQuery(query, params, 'tasks')
-        const result = await getPoolInstance().query(query, params)
-        logDatabaseResult(result.rows.length, dbStart.startTime, 'tasks')
-
-        logResolverSuccess('tasks', result.rows, startTime)
-        return result.rows
+        // Company-scoped exactly as /api/tasks is (lib/tenancy/list-scope).
+        const rows = await listTasks(actor, filters, listScopeDeps('tasks'))
+        logResolverSuccess('tasks', rows, startTime)
+        return rows
       } catch (error) {
         logResolverError('tasks', error, startTime)
         // Return empty array on error to prevent crash
@@ -406,73 +367,13 @@ export const resolvers = {
 
     // Bugs
     bugs: async (_: any, filters: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
       const { startTime } = logResolverStart('bugs', filters)
       try {
-        let query = 'SELECT * FROM bugs WHERE deleted_at IS NULL'
-        const params: any[] = []
-        let paramIndex = 1
-
-        if (filters.assignedTo && filters.assignedTo.length > 0) {
-          query += ` AND assigned_to = ANY($${paramIndex++})`
-          params.push(filters.assignedTo)
-        }
-        if (filters.reportedBy && filters.reportedBy.length > 0) {
-          query += ` AND reported_by = ANY($${paramIndex++})`
-          params.push(filters.reportedBy)
-        }
-        if (filters.status && filters.status.length > 0) {
-          query += ` AND status = ANY($${paramIndex++})`
-          params.push(filters.status)
-        }
-        if (filters.severity && filters.severity.length > 0) {
-          query += ` AND severity = ANY($${paramIndex++})`
-          params.push(filters.severity)
-        }
-        if (filters.category && filters.category.length > 0) {
-          query += ` AND category = ANY($${paramIndex++})`
-          params.push(filters.category)
-        }
-        if (filters.type && filters.type.length > 0) {
-          query += ` AND type = ANY($${paramIndex++})`
-          params.push(filters.type)
-        }
-        if (filters.projectId) {
-          query += ` AND project_id = $${paramIndex++}`
-          params.push(filters.projectId)
-        }
-        if (filters.projectIds && filters.projectIds.length > 0) {
-          query += ` AND project_id = ANY($${paramIndex++})`
-          params.push(filters.projectIds)
-        }
-        if (filters.subprojectId) {
-          query += ` AND subproject_id = $${paramIndex++}`
-          params.push(filters.subprojectId)
-        }
-
-        // ✅ Custom sorting - resolved/closed items at bottom
-        query += ` ORDER BY 
-          CASE 
-            WHEN status IN ('Resolved', 'Closed') THEN 1 
-            ELSE 0 
-          END,
-          updated_at DESC`
-
-        if (filters.limit) {
-          query += ` LIMIT $${paramIndex++}`
-          params.push(filters.limit)
-        }
-        if (filters.offset) {
-          query += ` OFFSET $${paramIndex++}`
-          params.push(filters.offset)
-        }
-
-        const dbStart = logDatabaseQuery(query, params, 'bugs')
-        const result = await getPoolInstance().query(query, params)
-        logDatabaseResult(result.rows.length, dbStart.startTime, 'bugs')
-
-        logResolverSuccess('bugs', result.rows, startTime)
-        return result.rows
+        // Company-scoped exactly as /api/bugs is (lib/tenancy/list-scope).
+        const rows = await listBugs(actor, filters, listScopeDeps('bugs'))
+        logResolverSuccess('bugs', rows, startTime)
+        return rows
       } catch (error) {
         logResolverError('bugs', error, startTime)
         return [] // Return empty array on error
@@ -522,8 +423,8 @@ export const resolvers = {
 
     projects: async (_: any, __: any, { user }: any) => {
       if (!user) throw new Error('Unauthorized')
-      const result = await getPoolInstance().query('SELECT * FROM projects WHERE deleted_at IS NULL ORDER BY project_name ASC')
-      let projects = result.rows || []
+      // Same company test as /api/projects: platform admins keep every company.
+      let projects = await listProjects(user, listScopeDeps())
 
       // Filter by user assignment for non-admin/non-top_management users (Commented out to expose all projects)
       /*
@@ -1389,35 +1290,20 @@ export const resolvers = {
       return parseInt(result.rows[0]?.total_days || 0)
     },
 
-    tasks: async (user: any, _: any, { loaders }: any) => {
+    // Reachable from `users` and `user`, which return people from every company, so
+    // the rows are scoped to the session's company rather than the user's.
+    tasks: async (user: any, _: any, context: any) => {
+      const actor = requireUser(context)
       const employeeId = user.employee_id || user.employeeId
       if (!employeeId) return []
-      // FIXED: assigned_to and support are JSONB arrays. Fetch if employeeId is in either.
-      const result = await getPoolInstance().query(
-        `SELECT * FROM tasks
-         WHERE deleted_at IS NULL
-         AND (EXISTS (
-           SELECT 1 FROM jsonb_array_elements_text(assigned_to) AS elem
-           WHERE elem = $1
-         ) OR EXISTS (
-           SELECT 1 FROM jsonb_array_elements_text(
-             CASE WHEN support IS NULL OR support::text = 'null' OR support::text = '' THEN '[]'::jsonb ELSE support::jsonb END
-           ) AS elem
-           WHERE elem = $1
-         ))`,
-        [employeeId]
-      )
-      return result.rows
+      return listTasksOfUser(actor, employeeId, listScopeDeps())
     },
 
-    bugs: async (user: any, _: any, { loaders }: any) => {
+    bugs: async (user: any, _: any, context: any) => {
+      const actor = requireUser(context)
       const employeeId = user.employee_id || user.employeeId
       if (!employeeId) return []
-      const result = await getPoolInstance().query(
-        'SELECT * FROM bugs WHERE assigned_to = $1 AND deleted_at IS NULL',
-        [employeeId]
-      )
-      return result.rows
+      return listBugsOfUser(actor, employeeId, listScopeDeps())
     }
   },
 
@@ -1937,12 +1823,9 @@ export const resolvers = {
     createdAt: (project: any) => project.created_at,
     updatedAt: (project: any) => project.updated_at,
 
-    tasks: async (project: any) => {
-      const result = await getPoolInstance().query(
-        'SELECT * FROM tasks WHERE project_id = $1 AND deleted_at IS NULL',
-        [project.project_id]
-      )
-      return result.rows
+    tasks: async (project: any, _: any, context: any) => {
+      const actor = requireUser(context)
+      return listTasksOfProject(actor, project.project_id, listScopeDeps())
     },
 
     assignedUsers: async (project: any) => {
