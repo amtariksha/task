@@ -16,6 +16,7 @@ import { createTask } from '../services/taskService'
 import { getAllUsers } from '../services/userService'
 import { getUserData } from '../utils/secureStorage'
 import { get } from '../services/apiClient'
+import { getMainProjects, getSubprojects, type Project } from '../services/projectService'
 import { useTheme } from '../contexts/ThemeContext'
 import { useResponsive } from '../hooks/useResponsive'
 import { materialTypography, materialSpacing } from '../config/materialTheme'
@@ -48,22 +49,12 @@ export default function CreateTaskScreen({ navigation }: any) {
   const [meetingLink, setMeetingLink] = useState('')
   const [meetingReminder, setMeetingReminder] = useState(false)
 
-  const STATIC_PROJECTS = [
-    { projectId: 'dsn', projectName: 'dsn' },
-    { projectId: 'amtariksha', projectName: 'amtariksha' },
-    { projectId: 'task management', projectName: 'task management' },
-    { projectId: 'swarg', projectName: 'swarg' },
-    { projectId: 'other', projectName: 'other' }
-  ]
-  const STATIC_SUBPROJECTS = [
-    { projectId: 'testing', projectName: 'testing' },
-    { projectId: 'development', projectName: 'development' },
-    { projectId: 'reporting', projectName: 'reporting' }
-  ]
-
   const [users, setUsers] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>(STATIC_PROJECTS)
-  const [subprojects, setSubprojects] = useState<any[]>(STATIC_SUBPROJECTS)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [projectsLoading, setProjectsLoading] = useState(true)
+  const [projectsError, setProjectsError] = useState<string | null>(null)
+  const [subprojects, setSubprojects] = useState<Project[]>([])
+  const [subprojectsError, setSubprojectsError] = useState<string | null>(null)
   const [settings, setSettings] = useState<any>({})
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [projectUsers, setProjectUsers] = useState<any[]>([])
@@ -86,6 +77,28 @@ export default function CreateTaskScreen({ navigation }: any) {
     });
   };
 
+  // Only real projects are offered. A task filed under a made-up id belongs to
+  // no project, so an empty or failed list is shown as such, never padded.
+  const loadProjects = useCallback(async () => {
+    setProjectsLoading(true)
+    try {
+      const response = await getMainProjects()
+      if (response.success) {
+        setProjects(response.data)
+        setProjectsError(null)
+      } else {
+        setProjects([])
+        setProjectsError(response.error)
+      }
+    } catch (error) {
+      console.error('Failed to load projects:', error)
+      setProjects([])
+      setProjectsError('Could not load projects')
+    } finally {
+      setProjectsLoading(false)
+    }
+  }, [])
+
   const loadInitialData = useCallback(async () => {
     try {
       // Get current user
@@ -100,19 +113,6 @@ export default function CreateTaskScreen({ navigation }: any) {
       const usersResponse = await getAllUsers()
       if (usersResponse.success && usersResponse.data) {
         setUsers(usersResponse.data)
-      }
-
-      // Load projects
-      const projectsResponse = await get('/api/projects?type=main')
-      if (projectsResponse.success && projectsResponse.data) {
-        // Merge with static, avoiding duplicates
-        const newProjects = [...STATIC_PROJECTS]
-        projectsResponse.data.forEach((p: any) => {
-          if (!newProjects.find(sp => sp.projectId === p.projectId)) {
-            newProjects.push(p)
-          }
-        })
-        setProjects(newProjects)
       }
 
       // Load settings
@@ -135,22 +135,12 @@ export default function CreateTaskScreen({ navigation }: any) {
     }
   }, [])
 
-  const loadSubprojects = useCallback(async (parentId: string) => {
-    try {
-      const response = await get(`/api/projects?parentId=${parentId}`)
-      let newSubprojects = [...STATIC_SUBPROJECTS]
-      if (response.success && response.data) {
-        newSubprojects = [...newSubprojects, ...response.data] // Add backend ones
-      }
-      setSubprojects(newSubprojects)
-    } catch (error) {
-      console.error('Failed to load subprojects:', error)
-    }
-  }, [])
-
+  // Loaded on its own so a failure elsewhere in the initial load cannot leave
+  // the project picker stuck on "Loading".
   useEffect(() => {
     loadInitialData()
-  }, [loadInitialData])
+    loadProjects()
+  }, [loadInitialData, loadProjects])
 
 
   // Fetch users assigned specifically to the selected project from the backend.
@@ -178,15 +168,34 @@ export default function CreateTaskScreen({ navigation }: any) {
   }, [])
 
   useEffect(() => {
-    if (projectId) {
-      loadSubprojects(projectId)
-      loadProjectUsers(projectId)
-    } else {
-      setSubprojects(STATIC_SUBPROJECTS)
+    setSubprojects([])
+    setSubprojectsError(null)
+    if (!projectId) {
       setSubprojectId('')
       setProjectUsers([])
+      return
     }
-  }, [projectId, loadSubprojects, loadProjectUsers])
+    loadProjectUsers(projectId)
+
+    // A slow answer for the previously chosen project must not replace this one's.
+    let cancelled = false
+    getSubprojects(projectId)
+      .then((response) => {
+        if (cancelled) return
+        if (response.success) {
+          setSubprojects(response.data)
+        } else {
+          setSubprojectsError(response.error)
+        }
+      })
+      .catch((error: unknown) => {
+        console.error('Failed to load subprojects:', error)
+        if (!cancelled) setSubprojectsError('Could not load sub-projects')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [projectId, loadProjectUsers])
 
   // The assignee defaults to the signed-in user before any project is chosen, so
   // it can end up naming someone who is not a member of the project that was
@@ -488,8 +497,25 @@ export default function CreateTaskScreen({ navigation }: any) {
               setSubprojectId('')
             }}
             items={getPickerItems(projects)}
-            disabled={isOffline}
+            disabled={isOffline || projects.length === 0}
           />
+          {projectsLoading ? (
+            <Text style={styles.helpText}>Loading your projects…</Text>
+          ) : projectsError ? (
+            <View style={styles.noticeRow}>
+              <Text style={[styles.helpText, styles.noticeError, styles.noticeText]}>{projectsError}</Text>
+              <Button mode="text" compact onPress={loadProjects} disabled={isOffline}>
+                Retry
+              </Button>
+            </View>
+          ) : projects.length === 0 ? (
+            <Text style={styles.helpText}>
+              No projects to choose from. Tasks can only be filed in projects you have been added to.
+            </Text>
+          ) : null}
+          {subprojectsError ? (
+            <Text style={[styles.helpText, styles.noticeError]}>{subprojectsError}</Text>
+          ) : null}
 
           {/* Subproject */}
           {projectId && subprojects.length > 0 && (
@@ -780,6 +806,17 @@ const getStyles = (colors: any, responsive: any) => StyleSheet.create({
     ...materialTypography.bodySmall,
     color: colors.textSecondary,
     marginTop: materialSpacing.xs,
+  },
+  noticeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  noticeText: {
+    flex: 1,
+  },
+  noticeError: {
+    color: colors.error,
   },
   buttonContainer: {
     flexDirection: 'row',

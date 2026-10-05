@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type JSX, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX, type ReactNode } from 'react'
 import { Alert, ScrollView, StyleSheet, View } from 'react-native'
 import { ActivityIndicator, Button, Divider, IconButton, Text } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context'
@@ -87,6 +87,11 @@ export function FounderRankScreen(): JSX.Element {
   // Unknown (null) reachability is not offline.
   const isOffline = isConnected === false || isInternetReachable === false
   const [lists, setLists] = useState<RankLists | null>(null)
+  // Set just before leaving after a successful save. goBack runs straight after
+  // the mutation resolves, before any re-render could remove the beforeRemove
+  // listener, so without this the guard asked to discard an order that had
+  // just been saved.
+  const leavingAfterSaveRef = useRef(false)
 
   const { data, loading, error, refetch } = useQuery<FounderResumePointsQueryData, { includeParked: boolean }>(
     FOUNDER_RESUME_POINTS,
@@ -145,6 +150,7 @@ export function FounderRankScreen(): JSX.Element {
   useEffect(() => {
     if (!hasUnsavedChanges) return
     const unsubscribe = navigation.addListener('beforeRemove', (event: any) => {
+      if (leavingAfterSaveRef.current) return
       event.preventDefault()
       Alert.alert(
         'Discard your new order?',
@@ -167,6 +173,7 @@ export function FounderRankScreen(): JSX.Element {
         return
       }
       showToast('Ranks saved', 'success')
+      leavingAfterSaveRef.current = true
       navigation.goBack()
     } catch (caught) {
       showToast(errorText(caught, SAVE_FALLBACK_ERROR), 'error')
