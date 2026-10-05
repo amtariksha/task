@@ -49,6 +49,13 @@ task-management-*.json
 .env.production
 .env*.local
 
+# Android signing material. `eas credentials` → Download writes
+# @owner__slug.jks and @owner__slug-keystore-credentials.md into the cwd.
+# apps/mobile/android/.gitignore re-includes the public RN debug.keystore.
+*.jks
+*.keystore
+*keystore-credentials*
+
 # Development logs (local only)
 .dev-logs/
 
