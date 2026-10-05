@@ -55,6 +55,9 @@ These are fixed in the code but arrive only with the next mobile build:
 - An expired session on Start, Feed, Notifications or Attendance signs you out on its own. In 1.3.0 those screens just fail to load, so tap **Logout** in the drawer and sign in again.
 - A failed or empty founder check is recorded in **Debug Menu** → **Logs**, and the server's "you are a founder" answer is kept even when the phone cannot store it.
 - A sign-out happens only when the token the app currently holds is refused, and it runs only once.
+- **Add New Project** and **Create Sub-Project** report success when the project is created. In 1.3.0 they show **Failed to create project** (or **Failed to create subproject**) even then, so check **Projects** before trying again.
+- The **Project \*** list in **Create Task** shows your real projects, and the sub-project list shows only that project's sub-projects. In 1.3.0 it shows five built-in names that are not real projects, so create tasks on the web.
+- **Save** on **Rank threads** goes straight back after **Ranks saved**. In 1.3.0 it then asks **Discard your new order?**; tap **Discard**, the ranks are already saved.
 
 ### Outside Start
 
