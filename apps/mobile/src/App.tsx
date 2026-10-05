@@ -43,6 +43,7 @@ import DeletedItemsScreen from './screens/DeletedItemsScreen'
 import ReportsScreen from './screens/ReportsScreen'
 import { FounderStartScreen } from './screens/founder/FounderStartScreen'
 import { FounderRankScreen } from './screens/founder/FounderRankScreen'
+import { FounderBrainDumpScreen } from './screens/founder/FounderBrainDumpScreen'
 import NotificationBell from './components/NotificationBell'
 import CustomDrawerContent from './components/CustomDrawerContent'
 import { OfflineBanner } from './components/OfflineBanner'
@@ -625,14 +626,15 @@ function AppContent() {
   const notificationNavAtRef = useRef(0)
 
   // A key-less reset remounts Start even when it is already showing, which would throw away an open
-  // close-out (or unsaved rank edits), and it would replace a screen a notification tap just opened.
-  // In those cases today's Start is refetched in place instead.
+  // close-out (or unsaved rank edits, or pull a brain dump out from under the founder), and it would
+  // replace a screen a notification tap just opened. In those cases today's Start is refetched in place instead.
   const showStartForNewIstDay = useCallback(() => {
     const navigation = navigationRef.current
     const rootState = navigation?.isReady() ? navigation.getRootState() : undefined
     const focusedRoute = rootState?.routes[rootState.index]?.name
     const openedByNotification = notificationNavAtRef.current > backgroundedAtRef.current
-    if (focusedRoute === 'FounderStart' || focusedRoute === 'FounderRank' || openedByNotification) {
+    const keepsRoute = focusedRoute === 'FounderStart' || focusedRoute === 'FounderRank' || focusedRoute === 'FounderBrainDump'
+    if (keepsRoute || openedByNotification) {
       apolloClient.refetchQueries({ include: [FOUNDER_START] }).catch((error: unknown) => {
         console.warn('Failed to refetch Start for the new day:', error)
       })
@@ -1454,6 +1456,9 @@ function AppContent() {
                     />
                     {isFounder && (
                       <Stack.Screen name="FounderRank" component={FounderRankScreen} options={{ title: 'Rank threads' }} />
+                    )}
+                    {isFounder && (
+                      <Stack.Screen name="FounderBrainDump" component={FounderBrainDumpScreen} options={{ title: 'Brain dump' }} />
                     )}
                   </>
                 )}

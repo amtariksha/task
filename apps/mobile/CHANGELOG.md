@@ -10,6 +10,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- **Brain dump** (founder accounts only): Start → ⋮ → Brain dump. Type or
+  dictate one thought per line, check the list, and save it all as threads
+  in one go. The text is kept as a draft until it is saved.
+
 ### Fixed
 - An expired session on the Feed, Notifications, Attendance or Start screens
   now returns you to the sign-in screen instead of leaving them failing to load

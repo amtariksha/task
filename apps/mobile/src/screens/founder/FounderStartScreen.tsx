@@ -42,10 +42,11 @@ interface StartHeaderActionsProps {
   onToggleParked: () => void
   onPause: () => void
   onAddThread: () => void
+  onBrainDump: () => void
 }
 
 function StartHeaderActions(props: StartHeaderActionsProps): JSX.Element {
-  const { showParked, onHome, onRank, onToggleParked, onPause, onAddThread } = props
+  const { showParked, onHome, onRank, onToggleParked, onPause, onAddThread, onBrainDump } = props
   const { colors } = useTheme()
   const [menuVisible, setMenuVisible] = useState(false)
   const choose = (action: () => void) => () => {
@@ -69,6 +70,7 @@ function StartHeaderActions(props: StartHeaderActionsProps): JSX.Element {
         accessibilityState={{ checked: showParked }} />
       <Menu.Item title="Pause Start until…" onPress={choose(onPause)} accessibilityLabel="Pause Start until a date" />
       <Menu.Item title="Add thread" onPress={choose(onAddThread)} accessibilityLabel="Add thread" />
+      <Menu.Item title="Brain dump" onPress={choose(onBrainDump)} accessibilityLabel="Open Brain dump" />
       <Menu.Item title="Home" onPress={choose(onHome)} accessibilityLabel="Open Home" />
     </Menu>
   )
@@ -169,6 +171,7 @@ export function FounderStartScreen(): JSX.Element {
       onToggleParked={() => setShowParked((current) => !current)}
       onPause={() => setOpenDialog('pause')}
       onAddThread={() => setOpenDialog('add')}
+      onBrainDump={() => navigation.navigate('FounderBrainDump')}
     />
   )
 

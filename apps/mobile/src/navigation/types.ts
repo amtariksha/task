@@ -35,4 +35,5 @@ export type RootStackParamList = {
     Reports: undefined;
     FounderStart: undefined;
     FounderRank: undefined;
+    FounderBrainDump: undefined;
 };
