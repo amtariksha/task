@@ -20,6 +20,7 @@ import { format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endO
 import { getCurrentDateTime } from '@/lib/datetime-utils'
 import { signAuthToken } from '@/lib/auth-server'
 import { getDefaultCompanyId, isPlatformAdmin as dbIsPlatformAdmin } from '@/lib/db/companies'
+import { isUserAssignedToProject } from '@/lib/db/project-users'
 import {
   listBugs,
   listBugsOfUser,
@@ -27,8 +28,10 @@ import {
   listTasks,
   listTasksOfProject,
   listTasksOfUser,
+  listUsers,
   type ListScopeDeps,
 } from '@/lib/tenancy/list-scope'
+import { readBug, readTask, type BugReadDeps, type TaskReadDeps } from '@/lib/tenancy/item-access'
 
 // Helper to get current IST time as Date object (for logic comparisons)
 const getISTDate = (date: Date = new Date()) => addMinutes(date, 330) // UTC + 5:30
@@ -64,6 +67,17 @@ const listScopeDeps = (logLabel?: string): ListScopeDeps => ({
     if (dbStart) logDatabaseResult(result.rows.length, dbStart.startTime, logLabel)
     return result.rows
   },
+})
+
+// Lookups for the single-item access rules (lib/tenancy/item-access).
+const itemReadDeps = (loaders: any): TaskReadDeps & BugReadDeps => ({
+  isPlatformAdmin: async (actor) => {
+    const { isPlatformAdmin } = await import('@/lib/authz')
+    return isPlatformAdmin(actor)
+  },
+  isProjectMember: isUserAssignedToProject,
+  loadTask: (taskId) => loaders.task.load(taskId),
+  loadBug: (bugId) => loaders.bug.load(bugId),
 })
 
 // DataLoader for batching user queries
@@ -330,33 +344,19 @@ export const resolvers = {
       }
     },
 
-    task: async (_: any, { taskId }: any, { loaders, user }: any) => {
+    // The single-item reads ran their access gate only when a session was present,
+    // and skipped it for admin/top_management with no company check, so any
+    // company's task or bug could be read by id. Same rules as /api/tasks/[taskId]
+    // and /api/bugs/[bugId] now (lib/tenancy/item-access).
+    task: async (_: any, { taskId }: any, context: any) => {
+      const actor = requireUser(context)
       const { startTime } = logResolverStart('task', { taskId })
 
       try {
-        const result = await loaders.task.load(taskId)
+        const read = await readTask(actor, taskId, itemReadDeps(context.loaders))
+        if (read.status === 'forbidden') throw new Error('FORBIDDEN: no access to this task')
 
-        // Project-access gate (option F)
-        if (user && result && !['admin', 'top_management'].includes(user.role)) {
-          const employeeId = user.employeeId
-          const isAssignee = Array.isArray(result.assigned_to)
-            ? result.assigned_to.includes(employeeId)
-            : result.assigned_to === employeeId
-          const isAssigner = result.assigned_by === employeeId
-          const isSupporter = Array.isArray(result.support) && result.support.includes(employeeId)
-          let isProjectMember = false
-          if (result.project_id) {
-            const projRes = await getPoolInstance().query(
-              'SELECT 1 FROM project_users WHERE employee_id = $1 AND project_id = $2 LIMIT 1',
-              [employeeId, result.project_id]
-            )
-            isProjectMember = (projRes.rowCount || 0) > 0
-          }
-          if (!isAssignee && !isAssigner && !isSupporter && !isProjectMember) {
-            throw new Error('FORBIDDEN: no access to this task')
-          }
-        }
-
+        const result = read.status === 'found' ? read.row : null
         logResolverSuccess('task', result, startTime)
         return result
       } catch (error) {
@@ -380,29 +380,14 @@ export const resolvers = {
       }
     },
 
-    bug: async (_: any, { bugId }: any, { loaders, user }: any) => {
+    bug: async (_: any, { bugId }: any, context: any) => {
+      const actor = requireUser(context)
       const { startTime } = logResolverStart('bug', { bugId })
       try {
-        const result = await loaders.bug.load(bugId)
+        const read = await readBug(actor, bugId, itemReadDeps(context.loaders))
+        if (read.status === 'forbidden') throw new Error('FORBIDDEN: no access to this bug')
 
-        // Project-access gate (option F)
-        if (user && result && !['admin', 'top_management'].includes(user.role)) {
-          const employeeId = user.employeeId
-          const isReporter = result.reported_by === employeeId
-          const isAssignee = result.assigned_to === employeeId
-          let isProjectMember = false
-          if (result.project_id) {
-            const projRes = await getPoolInstance().query(
-              'SELECT 1 FROM project_users WHERE employee_id = $1 AND project_id = $2 LIMIT 1',
-              [employeeId, result.project_id]
-            )
-            isProjectMember = (projRes.rowCount || 0) > 0
-          }
-          if (!isReporter && !isAssignee && !isProjectMember) {
-            throw new Error('FORBIDDEN: no access to this bug')
-          }
-        }
-
+        const result = read.status === 'found' ? read.row : null
         logResolverSuccess('bug', result, startTime)
         return result
       } catch (error) {
@@ -415,10 +400,8 @@ export const resolvers = {
 
     users: async (_: any, __: any, { user }: any) => {
       if (!user) throw new Error('Unauthorized')
-      const result = await getPoolInstance().query(
-        "SELECT * FROM users ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name ASC"
-      )
-      return result.rows || []
+      // Same company test as GET /api/users: platform admins keep every company.
+      return listUsers(user, listScopeDeps())
     },
 
     projects: async (_: any, __: any, { user }: any) => {
@@ -453,7 +436,9 @@ export const resolvers = {
       return result.rows || []
     },
 
-    user: async (_: any, { employeeId }: any) => {
+    user: async (_: any, { employeeId }: any, context: any) => {
+      // Session only, as GET /api/users/[employeeId]: that route has no company check.
+      requireUser(context)
       // The schema arg is `employeeId` and the users PK is `employee_id`
       // (there is no `id` column) — the previous version always errored.
       const result = await getPoolInstance().query('SELECT * FROM users WHERE employee_id = $1', [employeeId])

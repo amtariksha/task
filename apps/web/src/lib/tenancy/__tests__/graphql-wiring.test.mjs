@@ -61,4 +61,57 @@ describe('GraphQL list resolvers go through lib/tenancy/list-scope', () => {
       assert.match(resolversSource, delegation)
     }
   })
+
+  test('users delegates to its scoped list function', () => {
+    assert.match(
+      resolversSource,
+      /users: async \(_: any, __: any, \{ user \}: any\) => \{\s+if \(!user\) throw[^\n]*\n[^\n]*\n\s+return listUsers\(user, /
+    )
+  })
+})
+
+/** One resolver's source, from its signature to the brace that closes it. */
+function resolverBody(source, signature) {
+  const start = source.indexOf(signature)
+  assert.ok(start >= 0, `resolver not found: ${signature}`)
+  const indent = source.slice(source.lastIndexOf('\n', start) + 1, start)
+  const end = source.indexOf(`\n${indent}},\n`, start)
+  assert.ok(end > start, `end of resolver not found: ${signature}`)
+  return source.slice(start, end)
+}
+
+describe('GraphQL single-item reads go through lib/tenancy/item-access', () => {
+  const requirementSource = graphqlSources.find(({ file }) => file === 'requirement-resolvers.ts').source
+
+  test('task and bug require a session first, then delegate to readTask / readBug', () => {
+    const task = resolverBody(resolversSource, 'task: async (_: any, { taskId }: any, context: any) => {')
+    assert.match(task, /^[^\n]*\n\s+const actor = requireUser\(context\)\n/)
+    assert.match(task, /readTask\(actor, taskId, /)
+
+    const bug = resolverBody(resolversSource, 'bug: async (_: any, { bugId }: any, context: any) => {')
+    assert.match(bug, /^[^\n]*\n\s+const actor = requireUser\(context\)\n/)
+    assert.match(bug, /readBug\(actor, bugId, /)
+  })
+
+  test('no resolver runs its own project-membership gate any more', () => {
+    assert.doesNotMatch(resolversSource, /FROM project_users WHERE employee_id = \$1 AND project_id = \$2/)
+  })
+
+  test('user(employeeId) requires a session before it reads', () => {
+    const user = resolverBody(resolversSource, 'user: async (_: any, { employeeId }: any, context: any) => {')
+    assert.ok(user.indexOf('requireUser(context)') > 0, 'user(employeeId) does not call requireUser')
+    assert.ok(user.indexOf('requireUser(context)') < user.indexOf('.query('), 'user(employeeId) reads before requireUser')
+  })
+
+  test('requirements check the tenant boundary, with no global-role shortcut', () => {
+    const guard = requirementSource.match(/async function requireProjectMember\([\s\S]*?\n\}/)
+    assert.ok(guard, 'requireProjectMember not found')
+    assert.match(guard[0], /canViewProjectRequirements\(user, projectId, /)
+    assert.doesNotMatch(guard[0], /'admin'|'top_management'/)
+  })
+
+  test('section revisions are refused, not unguarded, when the requirement is gone', () => {
+    const revisions = resolverBody(requirementSource, 'requirementSectionRevisions: async (_: any, { sectionId }: any, context: any) => {')
+    assert.match(revisions, /if \(!req\) return \[\]\n\s+await requireProjectMember\(context, req\.projectId\)/)
+  })
 })

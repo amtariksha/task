@@ -14,6 +14,8 @@
  *                another company's work through the company switcher.
  *   projects     /api/projects — the same company test, except that platform
  *                admins keep the wide view.
+ *   users        GET /api/users — members of the session company; platform admins
+ *                keep the wide view.
  *
  * NULL company_id rows are legacy items migration 063 could not resolve; they stay
  * visible, as they do over REST. A token with no companyId (issued before 062) is
@@ -86,6 +88,11 @@ export function workItemListScope(actor: ScopeActor): CompanyScope {
 export function projectListScope(actor: ScopeActor): CompanyScope {
   if (actor.isPlatformAdmin) return UNSCOPED
   return workItemListScope(actor)
+}
+
+/** Users: the rule GET /api/users applies — same as projects. */
+export function userListScope(actor: ScopeActor): CompanyScope {
+  return projectListScope(actor)
 }
 
 export function isInCompanyScope(scope: CompanyScope, companyId: string | null | undefined): boolean {
@@ -219,6 +226,27 @@ export function buildProjectTasksQuery(actor: ScopeActor, projectId: string): Sq
   return { text, values: params.values }
 }
 
+/**
+ * `users`. Scoped like getUsersByCompany(companyId, true): members of the session
+ * company through user_companies, inactive users included as the GraphQL query
+ * always returned them. Unscoped, it is the query this resolver always ran.
+ */
+export function buildUserListQuery(actor: ScopeActor): SqlQuery {
+  const scope = userListScope(actor)
+  if (scope.all) {
+    return {
+      text: "SELECT * FROM users ORDER BY CASE WHEN status = 'active' THEN 0 ELSE 1 END, name ASC",
+      values: [],
+    }
+  }
+  const params = createParams()
+  const text = `SELECT u.* FROM users u
+         JOIN user_companies uc ON uc.employee_id = u.employee_id
+         WHERE uc.company_id = ${params.add(scope.companyId)}
+         ORDER BY CASE WHEN u.status = 'active' THEN 0 ELSE 1 END, u.name ASC`
+  return { text, values: params.values }
+}
+
 async function run(built: SqlQuery, deps: ListScopeDeps): Promise<Row[]> {
   return deps.query(built.text, built.values)
 }
@@ -241,6 +269,10 @@ export function listBugsOfUser(actor: ScopeActor, employeeId: string, deps: List
 
 export function listTasksOfProject(actor: ScopeActor, projectId: string, deps: ListScopeDeps): Promise<Row[]> {
   return run(buildProjectTasksQuery(actor, projectId), deps)
+}
+
+export function listUsers(actor: ScopeActor, deps: ListScopeDeps): Promise<Row[]> {
+  return run(buildUserListQuery(actor), deps)
 }
 
 /**
