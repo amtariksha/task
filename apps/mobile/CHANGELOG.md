@@ -19,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   placeholder names (dsn, amtariksha, task management, swarg, other; testing,
   development, reporting) are gone, so a task can no longer be filed under a
   project that does not exist. If you are in no project yet, the screen says so
+- Saving a new order on the Rank screen no longer asks whether to discard it
 
 ---
 
