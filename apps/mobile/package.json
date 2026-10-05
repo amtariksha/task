@@ -1,6 +1,6 @@
 {
   "name": "@karmayog/mobile",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "Karmayog - React Native + Expo Mobile App",
   "main": "index.js",
