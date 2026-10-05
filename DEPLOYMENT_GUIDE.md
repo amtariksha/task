@@ -153,7 +153,7 @@ SMTP_USER=amtariksha@gmail.com
 SMTP_PASS=your-gmail-app-password
 
 # AWS S3
-AWS_ACCESS_KEY_ID=AKIA2JGJ2OTO4M3JH6MR
+AWS_ACCESS_KEY_ID=your-access-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=ap-south-1
 AWS_S3_BUCKET=amtariksha
@@ -613,7 +613,7 @@ cd apps/mobile/android
    ```
 
 3. **Save Credentials**
-   - Access Key ID: `AKIA2JGJ2OTO4M3JH6MR`
+   - Access Key ID: `your-access-key-id`
    - Secret Access Key: (save securely!)
    - Add to environment variables
 
@@ -699,7 +699,7 @@ SMTP_USER=amtariksha@gmail.com
 SMTP_PASS=your-gmail-app-password-16-chars
 
 # AWS S3
-AWS_ACCESS_KEY_ID=AKIA2JGJ2OTO4M3JH6MR
+AWS_ACCESS_KEY_ID=your-access-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=ap-south-1
 AWS_S3_BUCKET=amtariksha
@@ -724,7 +724,7 @@ SMTP_USER=your-mailtrap-user
 SMTP_PASS=your-mailtrap-pass
 
 # AWS S3 (use same bucket or separate dev bucket)
-AWS_ACCESS_KEY_ID=AKIA2JGJ2OTO4M3JH6MR
+AWS_ACCESS_KEY_ID=your-access-key-id
 AWS_SECRET_ACCESS_KEY=your-secret-access-key
 AWS_REGION=ap-south-1
 AWS_S3_BUCKET=amtariksha-dev

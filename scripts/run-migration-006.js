@@ -2,11 +2,16 @@ const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
 
+if (!process.env.MYSQL_PASSWORD) {
+  console.error('MYSQL_PASSWORD is not set. Export it and re-run.');
+  process.exit(1);
+}
+
 async function runMigration() {
   const connection = await mysql.createConnection({
     host: 'ls-2c38665177f03573f3e3e1c02d6c69b301466b75.crq8gq4ka0rw.ap-south-1.rds.amazonaws.com',
     user: 'u806435594_swarg',
-    password: 'W8zTtc>qL3?',
+    password: process.env.MYSQL_PASSWORD,
     database: 'task',
     multipleStatements: true
   });

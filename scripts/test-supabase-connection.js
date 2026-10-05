@@ -115,10 +115,10 @@ async function main() {
     console.log('\n💡 Recommended for Vercel:')
     if (results['Transaction Pooler (Port 6543)']) {
       console.log('   Use: Transaction Pooler (Port 6543)')
-      console.log('   DATABASE_URL=postgresql://postgres:W8zTtc%3EqL3%3F@db.rbckjkdohzbclomrufrx.supabase.co:6543/postgres?pgbouncer=true')
+      console.log('   DATABASE_URL=postgresql://postgres:PASSWORD@db.rbckjkdohzbclomrufrx.supabase.co:6543/postgres?pgbouncer=true')
     } else if (results['Session Pooler (Port 5432)']) {
       console.log('   Use: Session Pooler (Port 5432)')
-      console.log('   DATABASE_URL=postgresql://postgres:W8zTtc%3EqL3%3F@db.rbckjkdohzbclomrufrx.supabase.co:5432/postgres')
+      console.log('   DATABASE_URL=postgresql://postgres:PASSWORD@db.rbckjkdohzbclomrufrx.supabase.co:5432/postgres')
     }
   }
   
