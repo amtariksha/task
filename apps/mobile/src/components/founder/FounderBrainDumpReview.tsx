@@ -21,6 +21,7 @@ type ThemeColors = ReturnType<typeof useTheme>['colors']
 type ReviewStyles = ReturnType<typeof getStyles>
 
 const HINT = 'Check each row, then save. Saved threads can be parked but not deleted, so fix dictation slips here. '
+  + 'A row you remove is left out of this save and stays in your draft. '
   + 'New threads have no rank: rank them on ⋮ → Rank threads to fill your Top 3.'
 
 interface ThreadsNoticeProps {

@@ -17,6 +17,10 @@ import {
 import { logger } from '../utils/debugLogger'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { buildApiUrl } from '../config/api'
+import { isDraftStorageKey } from '../utils/brainDump'
+
+// Every signed-in account can open this menu, and a founder's Brain dump draft outlives sign-out.
+const HIDDEN_VALUE = '(hidden: Brain dump draft)'
 
 interface DebugMenuProps {
   visible: boolean
@@ -38,8 +42,7 @@ export const DebugMenu: React.FC<DebugMenuProps> = ({ visible, onClose }) => {
       const data: Record<string, any> = {}
       
       for (const key of keys) {
-        const value = await AsyncStorage.getItem(key)
-        data[key] = value
+        data[key] = isDraftStorageKey(key) ? HIDDEN_VALUE : await AsyncStorage.getItem(key)
       }
       
       setStorageData(data)

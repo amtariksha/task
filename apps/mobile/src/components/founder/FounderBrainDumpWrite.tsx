@@ -15,8 +15,8 @@ export interface FounderBrainDumpWriteProps {
 
 type ThemeColors = ReturnType<typeof useTheme>['colors']
 
-const HINT = 'One thought per line. Put its next action after -> or : (for example, Hiring -> Post job ad). '
-  + 'When dictating, say “new line” between thoughts.'
+const HINT = 'One thought per line. Put its next action after -> (for example, Hiring -> Post job ad), '
+  + 'or after : on a line with no arrow. When dictating, say “new line” between thoughts.'
 const PLACEHOLDER = 'Hiring -> Post job ad\nInvestor deck: Update traction slide\nGST filing'
 
 export function FounderBrainDumpWrite(props: FounderBrainDumpWriteProps): JSX.Element {

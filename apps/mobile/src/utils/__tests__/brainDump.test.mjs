@@ -5,13 +5,17 @@ import {
   MAX_ENTRIES,
   MAX_LABEL_LENGTH,
   MAX_NEXT_ACTION_LENGTH,
+  normalizeLabel,
   parseLine,
   parseBrainDump,
+  leftOutLines,
   thoughtCountText,
   reviewBrainDump,
   saveBlocker,
+  threadsStateOf,
   rowsMatchText,
   draftStorageKey,
+  isDraftStorageKey,
   toStoredDraft,
   parseStoredDraft,
   isEmptyDraft,
@@ -34,9 +38,20 @@ describe('parseLine', () => {
     assert.deepEqual(parseLine('Investor deck'), { label: 'Investor deck', nextAction: '' })
   })
 
-  test('the earliest separator wins, later ones stay in the next action', () => {
-    assert.deepEqual(parseLine('Re: pricing -> call Ravi'), { label: 'Re', nextAction: 'pricing -> call Ravi' })
+  test('an arrow wins over any colon, so prefixes such as Re: or TODO: stay in the label', () => {
+    assert.deepEqual(parseLine('Re: pricing -> call Ravi'), { label: 'Re: pricing', nextAction: 'call Ravi' })
+    assert.deepEqual(parseLine('TODO: renew domain → pay registrar'), { label: 'TODO: renew domain', nextAction: 'pay registrar' })
+    assert.deepEqual(parseLine('Q3 plan: hiring -> draft JD'), { label: 'Q3 plan: hiring', nextAction: 'draft JD' })
     assert.deepEqual(parseLine('Swarg -> menu: email chef'), { label: 'Swarg', nextAction: 'menu: email chef' })
+  })
+
+  test('the first arrow splits, later arrows stay in the next action', () => {
+    assert.deepEqual(parseLine('Deck -> fix chart -> send'), { label: 'Deck', nextAction: 'fix chart -> send' })
+  })
+
+  test('without an arrow, the first colon splits', () => {
+    assert.deepEqual(parseLine('Re: Investor email'), { label: 'Re', nextAction: 'Investor email' })
+    assert.deepEqual(parseLine('Call at 10: discuss pricing'), { label: 'Call at 10', nextAction: 'discuss pricing' })
   })
 
   test('URLs, times and arrows without spaces do not split', () => {
@@ -81,8 +96,20 @@ describe('parseLine', () => {
     assert.deepEqual(parseLine('- -> call Ravi'), { label: '', nextAction: 'call Ravi' })
   })
 
-  test('inner whitespace is kept, as the server keeps it', () => {
-    assert.deepEqual(parseLine('  Big   deal  -> x '), { label: 'Big   deal', nextAction: 'x' })
+  test('label spacing is collapsed, so a dictated or pasted label matches the typed one', () => {
+    assert.deepEqual(parseLine('  Big   deal  -> x '), { label: 'Big deal', nextAction: 'x' })
+    assert.deepEqual(parseLine('Big\u00a0\tdeal'), { label: 'Big deal', nextAction: '' })
+  })
+})
+
+describe('normalizeLabel', () => {
+  test('collapses any whitespace and trims', () => {
+    assert.equal(normalizeLabel(' Investor \u00a0 deck\t'), 'Investor deck')
+  })
+
+  test('composes Unicode forms', () => {
+    assert.equal(normalizeLabel('Cafe\u0301'), 'Caf\u00e9')
+    assert.equal(normalizeLabel('\u0958'), normalizeLabel('\u0915\u093c'))
   })
 })
 
@@ -99,6 +126,25 @@ describe('parseBrainDump', () => {
   test('empty text has no rows', () => {
     assert.deepEqual(parseBrainDump(''), [])
     assert.deepEqual(parseBrainDump('\n\n  \n- \n'), [])
+  })
+})
+
+describe('leftOutLines', () => {
+  const text = 'Hiring -> Post ad\n\n- Deck\nTax: file GST\nGST'
+
+  test('none when every row is still there, edited or not', () => {
+    const rows = parseBrainDump(text).map((item) => ({ ...item, nextAction: 'edited' }))
+    assert.deepEqual(leftOutLines(text, rows), [])
+  })
+
+  test('the original lines of the removed rows, in order, blank lines skipped', () => {
+    const rows = parseBrainDump(text).filter((item) => item.key === 'line-3')
+    assert.deepEqual(leftOutLines(text, rows), ['Hiring -> Post ad', 'Tax: file GST', 'GST'])
+  })
+
+  test('everything when every row was removed, nothing for empty text', () => {
+    assert.deepEqual(leftOutLines('A\r\nB', []), ['A', 'B'])
+    assert.deepEqual(leftOutLines('', []), [])
   })
 })
 
@@ -132,13 +178,31 @@ describe('reviewBrainDump: matching existing threads', () => {
     assert.deepEqual(review.entries, [{ label: 'Tax' }])
   })
 
-  test('an active match ignores capitals, replaces the next action and sends the stored label', () => {
+  test('an active match ignores capitals, replaces the next action and is sent by thread id', () => {
     const review = reviewBrainDump([row('a', 'hIRING', 'Post ad')], threads)
     assert.equal(review.rows[0].status, 'active')
     assert.equal(review.rows[0].thread.id, '1')
     assert.match(flagTexts(review.rows[0])[0], /^Already on Start — replaces its next action/)
     assert.equal(review.rows[0].detail, 'Now: Call agency')
-    assert.deepEqual(review.entries, [{ label: 'Hiring', nextAction: 'Post ad' }])
+    assert.deepEqual(review.entries, [{ resumePointId: '1', nextAction: 'Post ad' }])
+  })
+
+  test('an active match with the same next action is left out, so a stale thread does not look fresh', () => {
+    for (const nextAction of ['Call agency', ' call  AGENCY ']) {
+      const review = reviewBrainDump([row('a', 'Hiring', nextAction)], threads)
+      assert.equal(review.rows[0].status, 'active')
+      assert.deepEqual(flagTexts(review.rows[0]), ['Already on Start — same next action, nothing to save'])
+      assert.equal(review.rows[0].detail, null)
+      assert.equal(review.rows[0].hasError, false)
+      assert.deepEqual(review.entries, [], nextAction)
+    }
+  })
+
+  test('a parked match with the same next action is left out too', () => {
+    const parked = [thread('7', 'Old idea', { isActive: false, nextAction: 'Revisit' })]
+    const review = reviewBrainDump([row('a', 'old idea', 'Revisit')], parked)
+    assert.deepEqual(flagTexts(review.rows[0]), ['Parked — same next action, nothing to save'])
+    assert.deepEqual(review.entries, [])
   })
 
   test('an active match with no next action is left out of the save', () => {
@@ -160,7 +224,7 @@ describe('reviewBrainDump: matching existing threads', () => {
     assert.equal(review.rows[0].flags[0].tone, 'warning')
     assert.match(flagTexts(review.rows[0])[0], /stays parked and hidden from Start/)
     assert.match(review.rows[0].detail, /Show parked/)
-    assert.deepEqual(review.entries, [{ label: 'Old idea', nextAction: 'Revisit' }])
+    assert.deepEqual(review.entries, [{ resumePointId: '2', nextAction: 'Revisit' }])
   })
 
   test('a parked match with no next action is left out of the save', () => {
@@ -170,9 +234,17 @@ describe('reviewBrainDump: matching existing threads', () => {
     assert.deepEqual(review.entries, [])
   })
 
-  test('inner whitespace must match exactly, as on the server', () => {
-    const review = reviewBrainDump([row('a', 'Old  idea', 'x')], threads)
-    assert.equal(review.rows[0].status, 'new')
+  test('extra, tab or non-breaking spaces and Unicode forms still match, and the thread id is sent', () => {
+    const spaced = reviewBrainDump([row('a', 'Old \u00a0 idea', 'x')], threads)
+    assert.equal(spaced.rows[0].status, 'parked')
+    assert.deepEqual(spaced.entries, [{ resumePointId: '2', nextAction: 'x' }])
+    const composed = reviewBrainDump([row('a', 'Cafe\u0301', 'x')], [thread('8', 'Caf\u00e9')])
+    assert.equal(composed.rows[0].status, 'active')
+  })
+
+  test('a new label is sent with its spacing collapsed', () => {
+    const review = reviewBrainDump([row('a', '  New \t idea ', 'x')], threads)
+    assert.deepEqual(review.entries, [{ label: 'New idea', nextAction: 'x' }])
   })
 
   test('before the threads load, rows are unknown and carry no match flags', () => {
@@ -181,29 +253,53 @@ describe('reviewBrainDump: matching existing threads', () => {
     assert.deepEqual(review.rows[0].flags, [])
   })
 
-  test('entries never carry waitingOn, note or resumePointId', () => {
+  test('entries never carry waitingOn or note', () => {
     const review = reviewBrainDump([row('a', 'Hiring', 'x'), row('b', 'New one')], threads)
+    assert.equal(review.entries.length, 2)
     for (const entry of review.entries) {
-      assert.deepEqual(Object.keys(entry).filter((key) => key !== 'label' && key !== 'nextAction'), [])
+      assert.deepEqual(Object.keys(entry).filter((key) => !['label', 'nextAction', 'resumePointId'].includes(key)), [])
     }
   })
 })
 
 describe('reviewBrainDump: duplicates inside the dump', () => {
-  test('same label with the same or one next action merges into the first row', () => {
+  test('same label with the same or one next action merges into the row that has the next action', () => {
     const review = reviewBrainDump([
       row('a', 'Hiring'),
       row('b', 'Deck', 'x'),
       row('c', ' hiring ', 'Post ad'),
-      row('d', 'HIRING', 'Post ad'),
+      row('d', 'HIRING', 'post  AD'),
     ], [])
     assert.deepEqual(review.entries, [
-      { label: 'Hiring', nextAction: 'Post ad' },
       { label: 'Deck', nextAction: 'x' },
+      { label: 'hiring', nextAction: 'Post ad' },
     ])
-    assert.deepEqual(flagTexts(review.rows[2]), ['Same label as row 1 — merged into it'])
-    assert.deepEqual(flagTexts(review.rows[3]), ['Same label as row 1 — merged into it'])
-    assert.equal(review.errorRowCount, 0)
+    assert.deepEqual(flagTexts(review.rows[0]), ['Same label as row 3 — merged into it'])
+    assert.deepEqual(flagTexts(review.rows[2]), ['New thread'])
+    assert.deepEqual(flagTexts(review.rows[3]), ['Same label as row 3 — merged into it'])
+    assert.deepEqual(review.errorRows, [])
+  })
+
+  test('the merged row of an existing thread shows the next action it sends', () => {
+    const review = reviewBrainDump(
+      [row('a', 'Swarg'), row('b', 'Deck', 'x'), row('c', 'swarg', 'menu -> call chef')],
+      [thread('5', 'Swarg', { nextAction: 'Fix webhook' })],
+    )
+    assert.deepEqual(flagTexts(review.rows[0]), ['Same label as row 3 — merged into it'])
+    assert.match(flagTexts(review.rows[2])[0], /^Already on Start — replaces its next action/)
+    assert.equal(review.rows[2].detail, 'Now: Fix webhook')
+    assert.deepEqual(review.entries[1], { resumePointId: '5', nextAction: 'menu -> call chef' })
+  })
+
+  test('with no next action anywhere, the first row is the one kept', () => {
+    const review = reviewBrainDump([row('a', 'Tax'), row('b', 'tax')], [])
+    assert.deepEqual(review.entries, [{ label: 'Tax' }])
+    assert.deepEqual(flagTexts(review.rows[1]), ['Same label as row 1 — merged into it'])
+  })
+
+  test('labels that differ only in spacing are duplicates', () => {
+    const review = reviewBrainDump([row('a', 'Investor deck', 'A'), row('b', 'Investor  deck', 'a')], [])
+    assert.deepEqual(review.entries, [{ label: 'Investor deck', nextAction: 'A' }])
   })
 
   test('a duplicate of an existing thread with no next action merges into a row that saves nothing', () => {
@@ -217,9 +313,9 @@ describe('reviewBrainDump: duplicates inside the dump', () => {
     const review = reviewBrainDump([row('a', 'Hiring', 'Post ad'), row('b', 'hiring', 'Call Ravi')], [])
     assert.equal(review.rows[0].hasError, true)
     assert.equal(review.rows[1].hasError, true)
-    assert.match(flagTexts(review.rows[0])[0], /row 2 with a different next action/)
+    assert.equal(flagTexts(review.rows[0])[0], 'Same label as row 2 with a different next action — edit a label or remove a row')
     assert.match(flagTexts(review.rows[1])[0], /row 1 with a different next action/)
-    assert.equal(review.errorRowCount, 2)
+    assert.deepEqual(review.errorRows, [1, 2])
     assert.deepEqual(review.entries, [])
   })
 })
@@ -227,28 +323,48 @@ describe('reviewBrainDump: duplicates inside the dump', () => {
 describe('reviewBrainDump: limits', () => {
   test('label 120 is fine, 121 is an error (after trimming)', () => {
     const ok = reviewBrainDump([row('a', ` ${'a'.repeat(MAX_LABEL_LENGTH)} `)], [])
-    assert.equal(ok.errorRowCount, 0)
+    assert.deepEqual(ok.errorRows, [])
     const long = reviewBrainDump([row('a', 'a'.repeat(MAX_LABEL_LENGTH + 1))], [])
-    assert.equal(long.errorRowCount, 1)
+    assert.deepEqual(long.errorRows, [1])
     assert.deepEqual(flagTexts(long.rows[0]), ['Label is 121 characters — limit 120'])
   })
 
   test('an emoji counts two, as the server counts it', () => {
     const review = reviewBrainDump([row('a', `${'a'.repeat(119)}🙂`)], [])
-    assert.equal(review.errorRowCount, 1)
+    assert.deepEqual(review.errorRows, [1])
   })
 
   test('next action 2000 is fine, 2001 is an error', () => {
-    assert.equal(reviewBrainDump([row('a', 'x', 'n'.repeat(MAX_NEXT_ACTION_LENGTH))], []).errorRowCount, 0)
+    assert.deepEqual(reviewBrainDump([row('a', 'x', 'n'.repeat(MAX_NEXT_ACTION_LENGTH))], []).errorRows, [])
     const long = reviewBrainDump([row('a', 'x', 'n'.repeat(MAX_NEXT_ACTION_LENGTH + 1))], [])
-    assert.equal(long.errorRowCount, 1)
+    assert.deepEqual(long.errorRows, [1])
     assert.match(flagTexts(long.rows[0])[0], /^Next action is 2001 characters — limit 2000/)
   })
 
   test('an empty label needs one', () => {
     const review = reviewBrainDump([row('a', '  ', 'call Ravi')], [])
     assert.deepEqual(flagTexts(review.rows[0]), ['Needs a label'])
-    assert.equal(review.errorRowCount, 1)
+    assert.deepEqual(review.errorRows, [1])
+  })
+})
+
+describe('threadsStateOf', () => {
+  test('loading until the network answers', () => {
+    assert.equal(threadsStateOf({ hasData: false, hasError: false, loading: true }), 'loading')
+  })
+
+  test('ready only with data and no error', () => {
+    assert.equal(threadsStateOf({ hasData: true, hasError: false, loading: false }), 'ready')
+    assert.equal(threadsStateOf({ hasData: true, hasError: false, loading: true }), 'ready')
+  })
+
+  test('an error fails even when data is on hand, so Save stays blocked and Retry shows', () => {
+    assert.equal(threadsStateOf({ hasData: true, hasError: true, loading: false }), 'failed')
+    assert.equal(threadsStateOf({ hasData: false, hasError: true, loading: false }), 'failed')
+  })
+
+  test('no data, no error and not loading is a failure, not an endless spinner', () => {
+    assert.equal(threadsStateOf({ hasData: false, hasError: false, loading: false }), 'failed')
   })
 })
 
@@ -269,9 +385,14 @@ describe('saveBlocker', () => {
     assert.match(saveBlocker({ ...ready([row('a', 'Tax')]), threads: 'failed' }), /Couldn’t load your threads/)
   })
 
-  test('error rows block', () => {
-    assert.equal(saveBlocker(ready([row('a', '', 'x')])), 'Fix the row marked in red to save.')
-    assert.equal(saveBlocker(ready([row('a', 'A', 'x'), row('b', 'a', 'y')])), 'Fix the 2 rows marked in red to save.')
+  test('error rows block, named by position rather than colour', () => {
+    const fine = (index) => row(`ok${index}`, `Fine ${index}`, 'x')
+    const broken = (index) => row(`bad${index}`, '', 'x')
+    assert.equal(saveBlocker(ready([fine(1), broken(2)])), 'Fix row 2 to save.')
+    assert.equal(saveBlocker(ready([row('a', 'A', 'x'), row('b', 'a', 'y')])), 'Fix rows 1 and 2 to save.')
+    assert.equal(saveBlocker(ready([broken(1), fine(2), broken(3), broken(4)])), 'Fix rows 1, 3 and 4 to save.')
+    const many = Array.from({ length: 8 }, (_, index) => broken(index))
+    assert.equal(saveBlocker(ready(many)), 'Fix rows 1, 2, 3, 4, 5 and 3 more to save.')
   })
 
   test('no rows, or only no-op rows, block', () => {
@@ -283,7 +404,7 @@ describe('saveBlocker', () => {
     assert.equal(saveBlocker(ready(manyRows(MAX_ENTRIES))), null)
     assert.equal(
       saveBlocker(ready(manyRows(MAX_ENTRIES + 1))),
-      'One save takes up to 50 threads and this has 51. Remove 1 to save.',
+      'One save takes up to 50 threads and this has 51. Remove 1 to save; removed rows stay in your draft for the next save.',
     )
   })
 
@@ -308,6 +429,12 @@ describe('rowsMatchText', () => {
 describe('draft storage', () => {
   test('the key is per employee', () => {
     assert.equal(draftStorageKey('AM-0001'), 'founder_brain_dump:AM-0001')
+  })
+
+  test('draft keys are recognised so the Debug Menu can hide them', () => {
+    assert.equal(isDraftStorageKey(draftStorageKey('AM-0001')), true)
+    assert.equal(isDraftStorageKey('founder_flag'), false)
+    assert.equal(isDraftStorageKey('founder_brain_dump'), false)
   })
 
   test('round-trips text and review rows', () => {
@@ -349,6 +476,14 @@ describe('savedToastText', () => {
     assert.equal(
       savedToastText([{ id: '1', isActive: true }, { id: '1', isActive: true }, { id: '2', isActive: false }]),
       'Brain dump saved — 2 threads, 1 still parked',
+    )
+  })
+
+  test('says how many removed rows stayed in the draft', () => {
+    assert.equal(savedToastText([{ id: '1', isActive: true }], 1), 'Brain dump saved — 1 thread. 1 removed row kept in your draft')
+    assert.equal(
+      savedToastText([{ id: '1', isActive: false }], 10),
+      'Brain dump saved — 1 thread, 1 still parked. 10 removed rows kept in your draft',
     )
   })
 })

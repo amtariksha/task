@@ -1,8 +1,8 @@
-import { useCallback, useMemo, useRef, useState, type JSX } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type JSX } from 'react'
 import { Alert, KeyboardAvoidingView, StyleSheet, View } from 'react-native'
 import { ActivityIndicator, Button, Text } from 'react-native-paper'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useNavigation } from '@react-navigation/native'
+import { StackActions, useNavigation, useRoute } from '@react-navigation/native'
 import { useMutation, useQuery } from '@apollo/client/react'
 import { FounderBrainDumpReview } from '../../components/founder/FounderBrainDumpReview'
 import type { BrainDumpRowPatch } from '../../components/founder/FounderBrainDumpRow'
@@ -15,12 +15,14 @@ import { useToast } from '../../contexts/ToastContext'
 import { useNetworkStatus } from '../../hooks/useNetworkStatus'
 import type { FounderCloseoutEntryInput, FounderResumePointsQueryData, FounderThread } from '../../types/founder'
 import {
-  draftStatusText, parseBrainDump, reviewBrainDump, rowsMatchText, saveBlocker, savedToastText, thoughtCountText,
-  type ThreadsState,
+  draftStatusText, leftOutLines, parseBrainDump, reviewBrainDump, rowsMatchText, saveBlocker, savedToastText,
+  thoughtCountText, threadsStateOf,
 } from '../../utils/brainDump'
 import { logger } from '../../utils/debugLogger'
 
 type ThemeColors = ReturnType<typeof useTheme>['colors']
+/** saved: the save succeeded and the screen is closing; nothing can be edited or saved again. */
+type SavePhase = 'editing' | 'saving' | 'saved'
 
 interface CloseoutMutationData { createFounderCloseout: FounderThread[] }
 interface CloseoutMutationVars { entries: FounderCloseoutEntryInput[] }
@@ -47,6 +49,7 @@ function useWindowTop() {
 
 export function FounderBrainDumpScreen(): JSX.Element {
   const navigation = useNavigation<any>()
+  const route = useRoute()
   const { colors } = useTheme()
   const styles = useMemo(() => getStyles(colors), [colors])
   const { showToast } = useToast()
@@ -54,14 +57,19 @@ export function FounderBrainDumpScreen(): JSX.Element {
   // NetInfo reports reachability as null while unknown; only an explicit false means offline.
   const isOffline = isConnected === false || isInternetReachable === false
   const frame = useWindowTop()
-  const { draft, ready, status, update, clear } = useBrainDumpDraft()
-  const [saving, setSaving] = useState(false)
-  const savingRef = useRef(false)
+  const { draft, ready, status, update, finishSave } = useBrainDumpDraft()
+  const [phase, setPhase] = useState<SavePhase>('editing')
+  const phaseRef = useRef<SavePhase>('editing')
+  const changePhase = useCallback((next: SavePhase) => {
+    phaseRef.current = next
+    setPhase(next)
+  }, [])
 
   // Parked threads too: a label that matches one updates that thread, which stays parked.
-  const { data, previousData, error, refetch } = useQuery<FounderResumePointsQueryData, { includeParked: boolean }>(
+  // network-only: the persisted cache misses threads made since (Add thread does not refresh this list).
+  const { data, error, loading, refetch } = useQuery<FounderResumePointsQueryData, { includeParked: boolean }>(
     FOUNDER_RESUME_POINTS,
-    { variables: { includeParked: true }, fetchPolicy: 'cache-and-network' },
+    { variables: { includeParked: true }, fetchPolicy: 'network-only' },
   )
   // Document form: refetches every watcher, i.e. Start underneath and an open parked list.
   const [createCloseout] = useMutation<CloseoutMutationData, CloseoutMutationVars>(
@@ -69,8 +77,9 @@ export function FounderBrainDumpScreen(): JSX.Element {
     { refetchQueries: [FOUNDER_START, FOUNDER_RESUME_POINTS] },
   )
 
-  const threads = (data ?? previousData)?.founderResumePoints ?? null
-  const threadsState: ThreadsState = threads ? 'ready' : error ? 'failed' : 'loading'
+  const threadsState = threadsStateOf({ hasData: Boolean(data?.founderResumePoints), hasError: Boolean(error), loading })
+  const threads = threadsState === 'ready' ? data?.founderResumePoints ?? null : null
+  const editable = phase === 'editing'
   const rows = draft.review
   const thoughtCount = useMemo(() => parseBrainDump(draft.text).length, [draft.text])
   const review = useMemo(() => reviewBrainDump(rows ?? [], threads), [rows, threads])
@@ -101,50 +110,71 @@ export function FounderBrainDumpScreen(): JSX.Element {
     ])
   }, [rows, draft.text, update])
 
+  // Under errorPolicy 'all' a failed refetch resolves with `error` rather than throwing.
   const handleRetryThreads = useCallback(async () => {
     try {
-      await refetch()
+      const result = await refetch()
+      if (result.error) showToast(result.error.message || 'Could not load threads', 'error')
     } catch (caught: unknown) {
       showToast(errorText(caught, 'Could not load threads'), 'error')
     }
   }, [refetch, showToast])
 
-  const leave = useCallback(() => {
-    // Back pressed while saving: this screen is gone, and goBack would pop whatever is showing now.
-    if (!navigation.isFocused()) return
-    if (navigation.canGoBack()) navigation.goBack()
-    else navigation.navigate('FounderStart')
-  }, [navigation])
+  useEffect(() => navigation.addListener('beforeRemove', (event: any) => {
+    if (phaseRef.current !== 'saving') return
+    event.preventDefault()
+    Alert.alert('Still saving', 'If you leave now, the save carries on. If it fails, your draft is still here.', [
+      { text: 'Stay', style: 'cancel' },
+      { text: 'Leave', onPress: () => navigation.dispatch(event.data.action) },
+    ])
+  }), [navigation])
 
-  // The draft is cleared only after the server answered without an error. A close-out is all or
-  // nothing, so on any failure nothing was saved and the draft still holds everything.
-  const handleSave = useCallback(async () => {
-    if (savingRef.current || blocker || !rows) return
-    const entries = review.entries
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: phase !== 'saving' })
+  }, [navigation, phase])
+
+  // By this screen's key: by the time the save answers, a notification may have opened a screen on
+  // top, and a plain goBack would close that one instead.
+  const leave = useCallback(() => {
+    const state = navigation.getState()
+    const index = state.routes.findIndex((item: { key: string }) => item.key === route.key)
+    if (index === -1) return
+    const action = index > 0 ? StackActions.pop() : StackActions.replace('FounderStart')
+    navigation.dispatch({ ...action, source: route.key, target: state.key })
+  }, [navigation, route.key])
+
+  // A close-out is all or nothing, so on any failure nothing was saved and the draft still holds everything.
+  const saveEntries = useCallback(async (entries: FounderCloseoutEntryInput[]): Promise<FounderThread[] | null> => {
     const fail = (message: string) => {
       showToast(message, 'error')
-      savingRef.current = false
-      setSaving(false)
+      changePhase('editing')
+      return null
     }
-    savingRef.current = true
-    setSaving(true)
     try {
       const result = await createCloseout({ variables: { entries } })
       const saved = result.data?.createFounderCloseout
-      if (result.error || !saved) {
-        fail(result.error?.message || SAVE_FALLBACK_ERROR)
-        return
-      }
+      if (result.error || !saved) return fail(result.error?.message || SAVE_FALLBACK_ERROR)
       if (saved.length !== entries.length) {
         logger.warn('Founder', 'Brain dump: the close-out returned a different number of threads', { sent: entries.length, received: saved.length })
       }
-      await clear()
-      showToast(savedToastText(saved), 'success')
-      leave()
+      return saved
     } catch (caught: unknown) {
-      fail(errorText(caught, SAVE_FALLBACK_ERROR))
+      return fail(errorText(caught, SAVE_FALLBACK_ERROR))
     }
-  }, [blocker, rows, review.entries, createCloseout, clear, showToast, leave])
+  }, [createCloseout, showToast, changePhase])
+
+  // Rows removed in Review were left out of the save, not thrown away: their lines stay as the draft.
+  const handleSave = useCallback(async () => {
+    if (phaseRef.current !== 'editing' || blocker || !rows) return
+    const keptLines = leftOutLines(draft.text, rows)
+    changePhase('saving')
+    const saved = await saveEntries(review.entries)
+    if (!saved) return
+    changePhase('saved')
+    await finishSave({ text: keptLines.join('\n'), review: null })
+    showToast(savedToastText(saved, keptLines.length), 'success')
+    leave()
+  }, [blocker, rows, draft.text, review.entries, saveEntries, changePhase, finishSave, showToast, leave])
 
   if (!ready) {
     return (
@@ -161,21 +191,21 @@ export function FounderBrainDumpScreen(): JSX.Element {
         <KeyboardAvoidingView behavior="padding" keyboardVerticalOffset={frame.top} style={styles.flex}>
           {rows ? (
             <FounderBrainDumpReview rows={rows} review={review} threadsState={threadsState} draftNote={draftNote}
-              editable={!saving} onRetryThreads={handleRetryThreads} onChangeRow={changeRow} onRemoveRow={removeRow} />
+              editable={editable} onRetryThreads={handleRetryThreads} onChangeRow={changeRow} onRemoveRow={removeRow} />
           ) : (
             <FounderBrainDumpWrite text={draft.text} thoughtCount={thoughtCount} draftNote={draftNote}
-              editable={!saving} onChangeText={changeText} />
+              editable={editable} onChangeText={changeText} />
           )}
           <View style={styles.bottomBar}>
             {rows ? (
               <>
                 {blocker ? <Text style={isOffline ? styles.offlineText : styles.blockerText}>{blocker}</Text> : null}
                 <View style={styles.actions}>
-                  <Button mode="text" onPress={backToText} disabled={saving} accessibilityRole="button"
+                  <Button mode="text" onPress={backToText} disabled={!editable} accessibilityRole="button"
                     accessibilityLabel="Edit the text">
                     Edit text
                   </Button>
-                  <Button mode="contained" onPress={handleSave} loading={saving} disabled={saving || blocker !== null}
+                  <Button mode="contained" onPress={handleSave} loading={phase === 'saving'} disabled={!editable || blocker !== null}
                     accessibilityRole="button" accessibilityLabel={`Save ${entryCount} ${entryCount === 1 ? 'thread' : 'threads'}`}>
                     {entryCount > 0 ? `Save (${entryCount})` : 'Save'}
                   </Button>

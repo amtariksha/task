@@ -49,14 +49,15 @@ export function FounderBrainDumpRow({ position, row, review, editable, onChange,
   return (
     <View style={[styles.card, review.hasError ? styles.cardError : null]}>
       <View style={styles.header}>
-        <View style={styles.badge}>
+        <View style={styles.badge} accessible accessibilityLabel={`Row ${position}${review.hasError ? ', needs fixing' : ''}`}>
           <Text style={styles.badgeText}>{position}</Text>
         </View>
         <View style={styles.flags} accessibilityLiveRegion="polite">
           {review.flags.map((flag) => <FlagPill key={flag.text} flag={flag} styles={styles} colors={colors} />)}
         </View>
         <IconButton icon="close" size={20} style={styles.remove} disabled={!editable} onPress={() => onRemove(row.key)}
-          accessibilityRole="button" accessibilityLabel={`Remove ${name}`} />
+          accessibilityRole="button" accessibilityLabel={`Remove ${name} from this save`}
+          accessibilityHint="Its line stays in your draft" />
       </View>
       <TextInput mode="outlined" dense label="Label" value={row.label} editable={editable}
         onChangeText={(label) => onChange(row.key, { label })} style={styles.input}
