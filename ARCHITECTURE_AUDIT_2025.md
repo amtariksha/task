@@ -34,7 +34,8 @@
 ### **Database Connection**
 ```typescript
 // apps/web/src/lib/db/config.ts
-DATABASE_URL=postgresql://postgres.rbckjkdohzbclomrufrx:W8zTtc%3EqL3%3F@aws-1-ap-south-1.pooler.supabase.com:6543/postgres
+// Real value: apps/web/.env.local (local) or the Vercel project's environment variables. Never commit it.
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:6543/postgres
 
 Pool Config:
 - max: 10 connections per serverless instance

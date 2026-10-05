@@ -104,13 +104,13 @@ node scripts/init-database.js --schema --data --verify
 
 ## Environment Variables
 
-Add these to your `.env.local` file:
+Add these to your `apps/web/.env.local` file (gitignored; never commit real values):
 
 ```env
-MYSQL_HOST=ls-2c38665177f03573f3e3e1c02d6c69b301466b75.crq8gq4ka0rw.ap-south-1.rds.amazonaws.com
+MYSQL_HOST=HOST
 MYSQL_PORT=3306
-MYSQL_USER=u806435594_swarg
-MYSQL_PASSWORD=W8zTtc>qL3?
+MYSQL_USER=USER
+MYSQL_PASSWORD=PASSWORD
 MYSQL_DATABASE=task
 ```
 
