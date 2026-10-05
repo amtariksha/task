@@ -14,6 +14,7 @@ import { pushTokenMutations } from './push-token-resolvers'
 import { requirementQueries, requirementMutations, requirementFieldResolvers } from './requirement-resolvers'
 import { founderQueries, founderMutations, founderFieldResolvers } from './founder-resolvers'
 import { isFounderEmployee } from '@/lib/founder/founder-auth'
+import { assertCanModifyTask, type TaskLookupDeps } from '@/lib/tasks/task-access'
 import { parseMentions, storeMentions } from '@/lib/mention-parser'
 import { createCommentNotification, createReactionNotification, createPostStatusNotification } from '@/lib/notification-helper'
 import { format, differenceInMinutes, startOfMonth, endOfMonth, startOfDay, endOfDay, addMinutes } from 'date-fns'
@@ -294,6 +295,15 @@ async function assertCanModifyBug(actor: ResolverActor, bugId: string): Promise<
   })
   if (!allowed) {
     throw new Error('FORBIDDEN: You do not have permission to modify this bug.')
+  }
+}
+
+/** Wires lib/tasks/task-access to the pool and lib/authz for updateTask / deleteTask. */
+async function taskAccessDeps(): Promise<TaskLookupDeps> {
+  const { canEditWorkItem } = await import('@/lib/authz')
+  return {
+    query: async (text, values) => (await getPoolInstance().query(text, values)).rows,
+    canEditWorkItem,
   }
 }
 
@@ -2250,7 +2260,10 @@ export const resolvers = {
     },
 
     updateTask: async (_: any, { taskId, input }: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
+      // PUT/PATCH /api/tasks/[taskId] enforce this; here any signed-in user of
+      // any company could rewrite any task by id.
+      await assertCanModifyTask(actor, taskId, await taskAccessDeps())
       const updates: string[] = []
       const params: any[] = []
       let paramIndex = 1
@@ -2311,7 +2324,8 @@ export const resolvers = {
     },
 
     deleteTask: async (_: any, { taskId }: any, context: any) => {
-      requireUser(context)
+      const actor = requireUser(context)
+      await assertCanModifyTask(actor, taskId, await taskAccessDeps())
       await getPoolInstance().query(
         'UPDATE tasks SET deleted_at = NOW() WHERE task_id = $1',
         [taskId]
