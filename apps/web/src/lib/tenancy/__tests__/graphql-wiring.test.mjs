@@ -109,4 +109,9 @@ describe('GraphQL single-item reads go through lib/tenancy/item-access', () => {
     assert.match(guard[0], /canViewProjectRequirements\(user, projectId, /)
     assert.doesNotMatch(guard[0], /'admin'|'top_management'/)
   })
+
+  test('section revisions are refused, not unguarded, when the requirement is gone', () => {
+    const revisions = resolverBody(requirementSource, 'requirementSectionRevisions: async (_: any, { sectionId }: any, context: any) => {')
+    assert.match(revisions, /if \(!req\) return \[\]\n\s+await requireProjectMember\(context, req\.projectId\)/)
+  })
 })

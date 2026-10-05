@@ -131,8 +131,11 @@ export const requirementQueries = {
     requireUser(context)
     const section = await reqDb.getSectionById(Number(sectionId))
     if (!section) return []
+    // Deleting a requirement leaves its sections in place. Without a requirement
+    // there is no project to check, so there is nothing to show either.
     const req = await reqDb.getRequirementById(section.requirementId)
-    if (req) await requireProjectMember(context, req.projectId)
+    if (!req) return []
+    await requireProjectMember(context, req.projectId)
     return reqDb.getSectionRevisions(Number(sectionId))
   },
 
