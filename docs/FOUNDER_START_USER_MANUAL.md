@@ -61,7 +61,7 @@ These are fixed in the code but arrive only with the next mobile build:
 Founders and platform admins also get these. None of them changes Start. Steps are in [Companies, Roles, Secrets and Approvals](#companies-roles-secrets-and-approvals).
 
 - **Company page** (web): **Admin** → **Company** shows the company you are working in. Platform admins add existing people there. Company admins can change members' roles and remove members, but cannot add existing people.
-- **Company split follow-up:** since 2026-09-29, Swarg (COMP-002) and Tattva Silicon (COMP-003) have their own projects, but nobody was moved. People must be added to those companies before those projects appear in their **Projects** list (their tasks and bugs still show in everyone's web **Tasks** and **Bugs** lists, which is a known gap being fixed, not intended), and you must join them yourself before the Company page can show them.
+- **Company split follow-up:** since 2026-09-29, Swarg (COMP-002) and Tattva Silicon (COMP-003) have their own projects, but nobody was moved. People must be added to those companies before those projects appear in their **Projects** list, and you must join them yourself before the Company page can show them.
 - **Project roles:** each project member is a manager, team leader or member, set on the project page (web) or Project details (mobile).
 - **Project secrets on mobile:** Project details → **Secrets** → **Open vault** shows names and reveals one value at a time after a fingerprint or face check. Adding and editing stay on the web.
 - **Approvals:** nobody can approve their own leave, WFH or attendance request, founders included.
@@ -917,7 +917,7 @@ These arrived in the same release as mobile 1.3.0. None of them changes Start.
 
 COMP-001 Amtariksha kept everything except two project trees. COMP-002 Swarg (code SW) has PRJ-037 Swarg Food and its sub-projects PRJ-045, PRJ-046 and PRJ-047. COMP-003 Tattva Silicon (code TS) has PRJ-051 and the projects under it: PRJ-048, PRJ-049 (with its own sub-project PRJ-050) and PRJ-052. PRJ-002 "Swarg" (Amtariksha's software work for Swarg) and its sub-projects stayed in COMP-001. Their tasks, bugs and requirements moved with the projects.
 
-Nobody was moved: every membership is still in COMP-001. Someone who is not a platform admin sees a Swarg or Tattva Silicon project in the **Projects** list only after they are a member of that company and have switched to it. Its tasks and bugs still show to everyone in the web **Tasks** and **Bugs** lists, because those two lists are not yet limited to one company. That is a known gap being fixed, not intended. Start is not affected.
+Nobody was moved: every membership is still in COMP-001. Someone who is not a platform admin sees a Swarg or Tattva Silicon project in the **Projects** list only after they are a member of that company and have switched to it. Start is not affected.
 
 To set it up:
 
