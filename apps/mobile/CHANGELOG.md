@@ -15,6 +15,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
   now returns you to the sign-in screen instead of leaving them failing to load
 - Adding a project or a sub-project no longer says it failed when the project
   was created, which led to creating it twice
+- Create Task lists only your real projects and their sub-projects. The
+  placeholder names (dsn, amtariksha, task management, swarg, other; testing,
+  development, reporting) are gone, so a task can no longer be filed under a
+  project that does not exist. If you are in no project yet, the screen says so
 
 ---
 

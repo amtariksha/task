@@ -9,11 +9,14 @@ import { API_ENDPOINTS } from '../config/api'
 import { executeGraphQLWithFallback } from './graphqlClient'
 import { QUERIES } from './graphqlQueries'
 import { ReleaseChecklistTemplate } from '../types'
-import { unwrapApiBody, type ApiResult } from '../utils/apiEnvelope'
+import { unwrapApiBody, unwrapApiList, type ApiResult } from '../utils/apiEnvelope'
+import { mainProjectsOf, subprojectsOf } from '../utils/projectOptions'
 
 export interface Project {
   projectId: string
   projectName: string
+  parentProjectId?: string | null
+  status?: string
   description?: string
   createdBy: string
   createdAt: string
@@ -57,6 +60,30 @@ export const getAllProjects = async (): Promise<ApiResponse<Project[]>> => {
     }
     return response
   })
+}
+
+/**
+ * Main projects the signed-in user is a member of, for a project picker.
+ * GET /api/projects answers with a bare array, not { success, data }.
+ */
+export const getMainProjects = async (): Promise<ApiResult<Project[]>> => {
+  const result = unwrapApiList<Project>(
+    await get(`${API_ENDPOINTS.PROJECTS}?type=main`),
+    'Could not load projects'
+  )
+  return result.success ? { success: true, data: mainProjectsOf(result.data) } : result
+}
+
+/**
+ * Sub-projects of one project. The route ignores `parentId` and returns every
+ * project the user can see, so the children are filtered out here.
+ */
+export const getSubprojects = async (parentId: string): Promise<ApiResult<Project[]>> => {
+  const result = unwrapApiList<Project>(
+    await get(`${API_ENDPOINTS.PROJECTS}?parentId=${encodeURIComponent(parentId)}`),
+    'Could not load sub-projects'
+  )
+  return result.success ? { success: true, data: subprojectsOf(result.data, parentId) } : result
 }
 
 export interface CreateProjectInput {
