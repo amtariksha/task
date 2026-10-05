@@ -3,10 +3,9 @@
  * Centralized HTTP client with authentication
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { buildApiUrl } from '../config/api'
-import { getUserToken, deleteSecure, SECURE_KEYS } from '../utils/secureStorage'
-import { triggerUnauthorized } from '../utils/authEvents'
+import { getUserToken } from '../utils/secureStorage'
+import { handleAuthRejection } from '../utils/sessionExpiry'
 
 export interface ApiResponse<T = any> {
   success: boolean
@@ -49,10 +48,7 @@ export const apiRequest = async <T = any>(
 
     // Handle 401 Unauthorized
     if (response.status === 401) {
-      console.warn('Unauthorized access, clearing secure token...')
-      await deleteSecure(SECURE_KEYS.USER_TOKEN)
-      await AsyncStorage.removeItem('userToken')
-      triggerUnauthorized()
+      await handleAuthRejection(token, `REST ${endpoint.split('?')[0]}`)
       return {
         success: false,
         error: 'Unauthorized',

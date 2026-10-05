@@ -3,27 +3,21 @@
  * Centralized GraphQL client with REST fallback for the mobile app
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { buildApiUrl } from '../config/api'
 import { ApiResponse } from './apiClient'
-import { getUserToken, deleteSecure, SECURE_KEYS } from '../utils/secureStorage'
-import { triggerUnauthorized } from '../utils/authEvents'
+import { getUserToken } from '../utils/secureStorage'
+import {
+  isUnauthenticatedError,
+  isForbiddenError,
+  isUnauthenticatedGraphQLError,
+  type GraphQLErrorLike,
+} from '../utils/authErrors'
+import { handleAuthRejection } from '../utils/sessionExpiry'
 
 export interface GraphQLResponse<T = any> {
   data?: T
-  errors?: Array<{ message: string }>
+  errors?: Array<GraphQLErrorLike & { message: string }>
 }
-
-/**
- * GraphQL reports authorization failures in the body with HTTP 200, so the
- * status-code handling in apiClient never saw them. An expired token therefore
- * left the app signed in, failing every query until the user restarted it.
- */
-export const isUnauthenticatedError = (message: string): boolean =>
-  /UNAUTHENTICATED|must be signed in|Unauthorized/i.test(message)
-
-export const isForbiddenError = (message: string): boolean =>
-  /FORBIDDEN|do not have permission|not authorized/i.test(message)
 
 /**
  * Execute GraphQL query or mutation
@@ -60,12 +54,10 @@ export const executeGraphQLQuery = async <T = any>(
     // Check for GraphQL errors
     if (result.errors && result.errors.length > 0) {
       const message = result.errors[0].message || 'GraphQL query failed'
-      if (response.status === 401 || isUnauthenticatedError(message)) {
-        // Same treatment a 401 gets in apiClient: drop the token and let the app
-        // return to the sign-in screen.
-        await deleteSecure(SECURE_KEYS.USER_TOKEN)
-        await AsyncStorage.removeItem('userToken')
-        triggerUnauthorized()
+      // GraphQL reports auth failures in the body with HTTP 200, so the status
+      // alone misses them. Same rule as the Apollo error link (config/apollo.ts).
+      if (response.status === 401 || result.errors.some(isUnauthenticatedGraphQLError)) {
+        await handleAuthRejection(token, 'GraphQL request')
       }
       throw new Error(message)
     }
