@@ -1,6 +1,8 @@
-// Server-side authentication utilities
-// This file does NOT have 'use client' directive and can be used in API routes
+// Server-side authentication utilities for route handlers and server code.
+// `server-only` makes the build fail if a client module imports this file,
+// which would otherwise risk bundling JWT_SECRET handling into the browser.
 
+import 'server-only'
 import { cookies } from 'next/headers'
 import jwt from 'jsonwebtoken'
 import { NextResponse } from 'next/server'
@@ -265,8 +267,8 @@ export async function requireUserAccess(
   const auth = await requireAuth(request)
   if (!auth.ok) return auth
 
-  // Imported lazily: authz pulls in the database layer, and auth-server is
-  // imported by middleware, which must stay light.
+  // Imported lazily: authz pulls in the database layer, which callers that
+  // only need token checks should not have to load.
   const { canViewUser } = await import('./authz')
   if (!(await canViewUser(auth.user, targetEmployeeId))) {
     return { ok: false, response: forbidden('You do not have access to this user’s records') }
