@@ -52,6 +52,7 @@ Mobile 1.3.0 (build 21) is the current app. The web Start page is unchanged sinc
 
 These are fixed in the code but arrive only with the next mobile build:
 
+- **⋮** → **Brain dump** (new): type or dictate everything in your head, one thought per line, check it and save it all as threads in one go. The text is kept as a draft until it is saved. See [Brain dump](#brain-dump-next-mobile-build).
 - An expired session on Start, Feed, Notifications or Attendance signs you out on its own. In 1.3.0 those screens just fail to load, so tap **Logout** in the drawer and sign in again.
 - A failed or empty founder check is recorded in **Debug Menu** → **Logs**, and the server's "you are a founder" answer is kept even when the phone cannot store it.
 - A sign-out happens only when the token the app currently holds is refused, and it runs only once.
@@ -499,6 +500,7 @@ Do not use **Add thread** for a list. Each thread it makes has no next action, s
 
 You need mobile 1.2.0 or later (1.3.0 is current). Use the phone for threads only:
 
+- **⋮** → **Brain dump** (next mobile build, not in 1.3.0): type or dictate the whole list, check it and save it in one go. See [Brain dump](#brain-dump-next-mobile-build) below.
 - **Close-out** (bottom right of Start) → **+ new** → type under **New thread** → **Add** → type the **Next action** → **+ new** for the next one → **Save (N)**. You see **Close-out saved**. It needs a connection.
 - **⋮** → **Rank threads** → tap the rank button on each **Unranked** row in priority order → **Save**.
 - **⋮** → **Add thread** closes after each thread and sets no next action. Use the close-out instead.
@@ -507,6 +509,36 @@ Create projects and tasks on the web. Mobile 1.3.0 has two bugs here:
 
 - **Add New Project** shows **Failed to create project** even when the project was created. Check **Projects** before trying again, or you get a duplicate.
 - The **Project \*** list in **Create Task** shows only five built-in names (**dsn**, **amtariksha**, **task management**, **swarg**, **other**) instead of your projects. They are not real projects: a task filed under one of them belongs to no project. Do not use them.
+
+#### Brain dump (next mobile build)
+
+Not in 1.3.0: it arrives with the next mobile build. Like the close-out, it makes threads only, never projects or tasks.
+
+1. On Start, tap **⋮** → **Brain dump**.
+2. **Write.** Type or dictate one thought per line. To give a thought its next action, put it after ` -> `, ` → ` or `: `, for example `Hiring -> Post job ad` or `Investor deck: Update traction slide`. The first of these on a line splits it, so `Re: pricing -> call Ravi` gives the label **Re** (fix it in the next step). A colon with no space after it, as in `10:30` or `https://…`, does not split. Bullets at the start of a line (`- `, `* `, `• `, `1. `, `1) `) and blank lines are ignored. When dictating, say "new line" between thoughts. Under the box you see the count (**12 thoughts**) and **Saving draft…** or **Draft saved**.
+3. Tap **Review (N)**. Each row has a number, its **Label** and **Next action** (both editable), a remove button (**×**) and one or more flags:
+
+   | Flag | What Save does with the row |
+   |------|-----------------------------|
+   | **New thread** | Creates the thread, touched today. If exactly one project has exactly that name (ignoring capitals) and no other thread is linked to it, the new thread is linked to that project. |
+   | **No next action — stays out of the Top 3 until it has one and a rank** | The new thread is still created, with no next action. |
+   | **Already on Start — replaces its next action** | The label matches an active thread, ignoring capitals. Your next action replaces its current one, shown below as **Now: …**. |
+   | **Already on Start — nothing to save. Add a next action to update it.** | Left out of the save, so the thread is not marked touched for nothing. |
+   | **Parked — gets this next action but stays parked and hidden from Start** | Updates the parked thread, which stays parked. To see it on Start, unpark it from **⋮** → **Show parked**. |
+   | **Parked — nothing to save. Add a next action to update it.** | Left out of the save. |
+   | **Same label as row N — merged into it** | Two rows with the same label (ignoring capitals) and at most one next action between them are saved once, as row N. |
+   | **Same label as row N with a different next action — keep one** (red) | Save is blocked until you remove a row or change a label. |
+   | **Needs a label**, **Label is N characters — limit 120**, **Next action is N characters — limit 2000** (red) | Save is blocked until you fix the row. |
+
+4. Tap **Save (N)**. N is the number of threads that will be saved, after merging and leaving out rows with nothing to save. You see **Brain dump saved — N threads** (plus **, N still parked** if some went to parked threads) and are back on Start. **Edit text** takes you back to the text instead. If you changed or removed rows, it first asks **Undo your changes to the rows?** (**Keep reviewing** or **Undo changes**).
+
+Good to know:
+
+- **The draft is not lost.** It is saved on the phone as you type and when you leave the screen, lock the phone or switch company, and it comes back, in the step you left, the next time you open **Brain dump**. It is deleted only after a save succeeds. It is kept per person and stays after sign-out. It sits unencrypted on the phone and is visible in **Debug Menu** → **Storage**.
+- **Save needs a connection.** Offline, **Save** is disabled with **Offline — Brain dump needs a connection to save. Your draft is kept.** It also waits while the app is **Checking which of these are already threads…**. If that check fails, tap **Retry**.
+- **Up to 50 threads per save, all or nothing.** With more, Save is disabled with, for example, **One save takes up to 50 threads and this has 53. Remove 3 to save.** If a save fails, nothing is saved, the error is shown and the draft stays.
+- **It counts as your close-out.** Saving writes close-out check-ins, so the **No close-out since …** line on Start goes away. Because of those check-ins, saved threads can be parked but not deleted, so fix dictation slips before you save.
+- **New threads have no rank.** Rank them on **⋮** → **Rank threads** to bring them into the Top 3.
 
 ### Limits
 
