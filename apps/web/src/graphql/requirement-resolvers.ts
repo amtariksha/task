@@ -3,25 +3,50 @@
 import * as reqDb from '@/lib/db/requirements'
 import { generateSequentialRequirementId, generateSequentialBugId } from '@/lib/data'
 import { isUserAssignedToProject, canEditRequirements } from '@/lib/db/project-users'
+import { getProjectById } from '@/lib/db/projects'
+import { canAdminCompany, isPlatformAdmin } from '@/lib/authz'
+import { canViewProjectRequirements, type ProjectAccessDeps } from '@/lib/tenancy/item-access'
 import { createBug, getLatestBugId } from '@/lib/db/bugs'
 import { createActivityLog } from '@/lib/db/activityLog'
 import { createNotification } from '@/lib/notification-helper'
 import { splitRequirementText } from '@/lib/ai/requirementSplitter'
 
 // ── Auth guards (local; mirror requireUser in resolvers.ts) ──────────────────
-function requireUser(context: any): { employeeId: string; role: string; name: string } {
+// The verified JWT claims; companyId and isPlatformAdmin feed the tenant boundary.
+type RequirementActor = {
+  employeeId: string
+  role: string
+  name: string
+  companyId?: string | null
+  isPlatformAdmin?: boolean
+}
+
+function requireUser(context: any): RequirementActor {
   if (!context?.user?.employeeId) {
     throw new Error('UNAUTHENTICATED: You must be signed in.')
   }
   return context.user
 }
 
-// Project members (or admin/top_management) may access a project's requirements.
-async function requireProjectMember(context: any, projectId: string): Promise<{ employeeId: string; role: string; name: string }> {
+// Lookups for lib/tenancy/item-access.canViewProjectRequirements.
+const projectAccessDeps: ProjectAccessDeps = {
+  getProjectCompanyId: async (projectId) => {
+    // includeDeleted: a missing project must be distinguishable from an archived one.
+    const project = await getProjectById(projectId, true)
+    if (!project) return undefined
+    return (project as { companyId?: string | null }).companyId ?? null
+  },
+  isPlatformAdmin,
+  canAdminCompany,
+  isProjectMember: isUserAssignedToProject,
+}
+
+// Project members, and admins of the project's company, may access its
+// requirements. This used to let a global admin/top_management role into every
+// company's projects; the tenant boundary now comes first.
+async function requireProjectMember(context: any, projectId: string): Promise<RequirementActor> {
   const user = requireUser(context)
-  if (user.role === 'admin' || user.role === 'top_management') return user
-  const isMember = await isUserAssignedToProject(projectId, user.employeeId)
-  if (!isMember) {
+  if (!(await canViewProjectRequirements(user, projectId, projectAccessDeps))) {
     throw new Error('FORBIDDEN: You are not a member of this project.')
   }
   return user
@@ -31,7 +56,7 @@ const PRIVILEGED_ROLES = ['admin', 'top_management', 'management']
 
 // Editing requires membership AND (privileged role OR the per-assignment
 // can_edit_requirements flag). Viewing stays member-level (requireProjectMember).
-async function requireRequirementEditor(context: any, projectId: string): Promise<{ employeeId: string; role: string; name: string }> {
+async function requireRequirementEditor(context: any, projectId: string): Promise<RequirementActor> {
   const user = await requireProjectMember(context, projectId)
   if (PRIVILEGED_ROLES.includes(user.role)) return user
   const hasEditFlag = await canEditRequirements(user.employeeId, projectId)
