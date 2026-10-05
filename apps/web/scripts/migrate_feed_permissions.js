@@ -11,9 +11,14 @@
 
 const { Pool } = require('pg');
 
+if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not set. Export it (the value lives in apps/web/.env.local) and re-run.');
+    process.exit(1);
+}
+
 // Database connection configuration
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/jsr_db',
+    connectionString: process.env.DATABASE_URL,
 });
 
 async function migrateFeedPermissions() {
