@@ -2,8 +2,13 @@ const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
+if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not set. Export it (the value lives in apps/web/.env.local) and re-run.');
+    process.exit(1);
+}
+
 // Connection string from src/lib/db/config.ts
-const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.rbckjkdohzbclomrufrx:W8zTtc%3EqL3%3F@aws-1-ap-south-1.pooler.supabase.com:6543/postgres';
+const connectionString = process.env.DATABASE_URL;
 
 const pool = new Pool({
     connectionString,

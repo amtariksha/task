@@ -21,9 +21,14 @@ if (fs.existsSync(envPath)) {
 const pgPath = path.join(__dirname, '..', 'node_modules', 'pg')
 const { Client } = require(pgPath)
 
+if (!process.env.DATABASE_URL) {
+    console.error('DATABASE_URL is not set. Export it (the value lives in apps/web/.env.local) and re-run.')
+    process.exit(1)
+}
+
 async function runMigration() {
     // Use connection pooler with SSL
-    const connectionString = process.env.DATABASE_URL || 'postgresql://postgres.rbckjkdohzbclomrufrx:W8zTtc%3EqL3%3F@aws-1-ap-south-1.pooler.supabase.com:6543/postgres'
+    const connectionString = process.env.DATABASE_URL
 
     const client = new Client({
         connectionString,

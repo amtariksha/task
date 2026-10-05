@@ -13,23 +13,30 @@ require('dotenv').config({ path: 'apps/web/.env.local' })
 const mysql = require('mysql2/promise')
 const { Client } = require('pg')
 
+if (!process.env.MYSQL_PASSWORD) {
+  console.error('MYSQL_PASSWORD is not set. Export it and re-run.')
+  process.exit(1)
+}
+
+if (!process.env.DATABASE_URL) {
+  console.error('DATABASE_URL is not set. Export it (the value lives in apps/web/.env.local) and re-run.')
+  process.exit(1)
+}
+
 // MySQL Configuration (source)
 const MYSQL_CONFIG = {
   host: process.env.MYSQL_HOST || 'ls-2c38665177f03573f3e3e1c02d6c69b301466b75.crq8gq4ka0rw.ap-south-1.rds.amazonaws.com',
   port: parseInt(process.env.MYSQL_PORT || '3306'),
   user: process.env.MYSQL_USER || 'u806435594_swarg',
-  password: process.env.MYSQL_PASSWORD || 'W8zTtc>qL3?',
+  password: process.env.MYSQL_PASSWORD,
   database: process.env.MYSQL_DATABASE || 'task',
   ssl: { rejectUnauthorized: false }
 }
 
 // PostgreSQL Configuration (destination - Supabase)
+// Point DATABASE_URL at the direct connection (port 5432), not the pooler, for bulk migration.
 const PG_CONFIG = {
-  host: 'db.rbckjkdohzbclomrufrx.supabase.co',
-  port: 5432, // Use direct connection for migration (not pooler)
-  user: 'postgres',
-  password: 'W8zTtc>qL3?',
-  database: 'postgres',
+  connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 }
 
