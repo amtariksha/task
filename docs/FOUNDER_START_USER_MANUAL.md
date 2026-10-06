@@ -236,6 +236,7 @@ While the page checks your access, you see a spinner. If you are not signed in, 
 
 The security PIN locks the mobile app. It is optional in 1.3.0: sign-in no longer makes you create one. If you have set one, it is asked for right after you sign in.
 
+- **Known problem in 1.3.0 and 1.4.0:** setting a PIN does not work. After **Save** on **Confirm New PIN** nothing happens and no PIN is stored, so the app never locks. The build after 1.4.0 fixes it.
 - **Turn it on:** drawer → **Account** → **App Settings** → **Security PIN**. Without a PIN the row reads **Off. Turn it on to lock the app when you leave it.** Tap **Set up**, type 4 digits under **Enter New PIN** and tap **Next**, then type them again under **Confirm New PIN** and tap **Save**. You see **Security PIN set**.
 - **With a PIN** the row reads **The app asks for this PIN after 5 minutes in the background.** It has two buttons. **Change** asks for the current PIN first. **Turn off** asks only **Turn off the security PIN?**, not for the PIN, so anyone holding your unlocked phone can turn it off.
 - **When it locks:** when you come back after 5 minutes or more away (from the background, or reopening a closed app) and right after you sign in. The lock screen is titled **App Locked**. If you switched on biometric login in Settings (for example **Fingerprint Login**), you can also tap **Unlock with Fingerprint**.

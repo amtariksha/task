@@ -479,7 +479,13 @@ export default function SettingsScreen() {
           return
         }
         // Per-user key: a device-wide PIN locked the next person to sign in.
-        await saveUserPin(employeeId, newPinInput)
+        try {
+          await saveUserPin(employeeId, newPinInput)
+        } catch (err) {
+          console.error('Failed to save the PIN:', err)
+          setChangePinError('Could not save the PIN. Please try again.')
+          return
+        }
         setHasPin(true)
         Alert.alert('Success', hasPin ? 'Security PIN changed successfully' : 'Security PIN set')
         setChangePinVisible(false)

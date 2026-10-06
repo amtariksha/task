@@ -10,6 +10,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store'
+import { pinStorageKey } from './pinStorageKey'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 // Keys for secure storage
@@ -20,19 +21,18 @@ export const SECURE_KEYS = {
 } as const
 
 /**
- * The app-lock PIN is stored PER USER — `userPin:<employeeId>`.
+ * The app-lock PIN is stored PER USER — `userPin.<employeeId>` (see pinStorageKey for why not a colon).
  *
  * It used to live under one device-wide `userPin` key, so on a shared device the
  * second person to sign in was locked behind the first person's PIN, and clearing
  * it on logout was the only thing standing between them and each other's session.
  * The web app was changed the same way (jsr_user_pin:<employeeId>).
  */
-const USER_PIN_PREFIX = 'userPin'
 
 /** The pre-per-user key, in both stores. Read once to migrate, then discarded. */
 const LEGACY_DEVICE_PIN_KEY = 'userPin'
 
-const pinKeyFor = (employeeId: string) => `${USER_PIN_PREFIX}:${employeeId}`
+const pinKeyFor = (employeeId: string) => pinStorageKey(employeeId)
 
 // Keys for regular storage (non-sensitive)
 export const STORAGE_KEYS = {

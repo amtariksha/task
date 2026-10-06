@@ -10,6 +10,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- The security PIN can be set again. In 1.3.0 and 1.4.0, **Save** on
+  **Confirm New PIN** did nothing and no PIN was stored, so the app never
+  locked. If saving a PIN ever fails, the dialog now says so.
+
 ---
 
 ## [1.4.0] — 2026-10-05
