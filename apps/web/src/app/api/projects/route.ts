@@ -16,7 +16,8 @@ import {
 } from '@/lib/db/projects'
 import { getUserProjectIds } from '@/lib/db/project-users'
 import { getAuthUser } from '@/lib/auth-server'
-import { canAdminCompany } from '@/lib/authz'
+import { projectCreateAccess } from '@/lib/tenancy/project-guard'
+import { INVALID_PARENT_ID_MESSAGE, parentIdFromBody } from '@/lib/tenancy/project-parent'
 import { Project } from '@/lib/types'
 
 /**
@@ -100,7 +101,9 @@ export async function GET(request: NextRequest) {
  *   createdBy: string (required, employee ID)
  * }
  * 
- * Permissions: Only admin and top_management can create projects
+ * Permissions: lib/tenancy/project-parent decideProjectCreate — an admin of the
+ * session company; for a sub-project, someone who also works in the parent's
+ * company and may manage the parent.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -121,28 +124,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // A sub-project inherits its parent's company; a top-level project belongs
-    // to the company this session is acting in.
-    const companyId = authUser.companyId
-    if (!body.parentProjectId && !companyId) {
+    const parent = parentIdFromBody(body.parentProjectId)
+    if (!parent.valid) {
       return NextResponse.json(
-        { error: 'No active company for this session. Sign in again or pick a company.' },
+        { success: false, error: INVALID_PARENT_ID_MESSAGE },
         { status: 400 }
       )
     }
 
-    if (companyId && !(await canAdminCompany(authUser, companyId))) {
+    // A sub-project inherits its parent's company; a top-level project belongs
+    // to the company this session is acting in. This used to check the session
+    // company only, so an admin of one company could create a sub-project inside
+    // another by naming one of its projects as the parent.
+    const access = await projectCreateAccess(authUser, parent.parentId)
+    if (!access.allowed) {
       return NextResponse.json(
-        { error: 'You do not have permission to create projects in this company.' },
-        { status: 403 }
+        { success: false, error: access.message },
+        { status: access.status }
       )
     }
 
     // Prepare project data. createdBy comes from the verified session.
     const projectData: Omit<Project, 'projectId' | 'createdAt' | 'updatedAt' | 'deletedAt' | 'deletedBy'> = {
       projectName: body.projectName,
-      companyId: companyId || undefined,
-      parentProjectId: body.parentProjectId || undefined,
+      companyId: authUser.companyId || undefined,
+      parentProjectId: parent.parentId || undefined,
       description: body.description || undefined,
       status: body.status || 'Active',
       createdBy: authUser.employeeId,
