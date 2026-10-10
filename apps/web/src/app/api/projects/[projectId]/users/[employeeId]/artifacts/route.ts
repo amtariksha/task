@@ -9,6 +9,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserArtifactCounts } from '@/lib/db/project-users'
+import { requireProjectRead } from '@/lib/tenancy/project-guard'
 
 export async function GET(
   request: NextRequest,
@@ -16,6 +17,12 @@ export async function GET(
 ) {
   try {
     const { projectId, employeeId } = await params
+
+    // Same boundary as the member list these counts belong to; this route had
+    // no check of its own.
+    const auth = await requireProjectRead(request, projectId)
+    if (!auth.ok) return auth.response
+
     const counts = await getUserArtifactCounts(projectId, employeeId)
 
     return NextResponse.json({

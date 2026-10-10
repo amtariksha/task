@@ -26,6 +26,7 @@ import {
 } from '../utils/permissions'
 import { isActiveCompanyAdmin } from '../services/companyService'
 import { createProject, type CreateProjectInput } from '../services/projectService'
+import { unwrapApiBody } from '../utils/apiEnvelope'
 
 interface SubProject {
   projectId: string
@@ -148,22 +149,27 @@ export default function ProjectDetailsScreen() {
       setIsCompanyAdmin(await isActiveCompanyAdmin())
 
       // Fetch Project
-      const projectRes: any = await apiClient.get(`/api/projects/${projectId}`)
-      if (projectRes && (projectRes.projectId || projectRes.success)) {
-        const projData = projectRes.projectId ? projectRes : projectRes.data
-        setProject(projData)
-        setEditName(projData.projectName)
-        setEditDescription(projData.description || '')
-        setEditStatus(projData.status === 'Deleted' ? 'Inactive' : projData.status)
-        setEditReleaseEnabled(projData.releaseEnabled === true)
-        setEditReleaseChecklist(
-          projData.releaseChecklist && Array.isArray(projData.releaseChecklist.sections)
-            ? projData.releaseChecklist
-            : { sections: [] }
-        )
-      } else {
-        setError('Failed to find project details')
+      const projectResult = unwrapApiBody<any>(
+        await apiClient.get(`/api/projects/${projectId}`),
+        'Failed to find project details'
+      )
+      const projData = projectResult.success ? projectResult.data : null
+      if (!projData?.projectId) {
+        // A refusal says why (the project belongs to another company). Show that,
+        // and skip the member and user lists: they are refused for the same reason.
+        setError(projectResult.success ? 'Failed to find project details' : projectResult.error)
+        return
       }
+      setProject(projData)
+      setEditName(projData.projectName)
+      setEditDescription(projData.description || '')
+      setEditStatus(projData.status === 'Deleted' ? 'Inactive' : projData.status)
+      setEditReleaseEnabled(projData.releaseEnabled === true)
+      setEditReleaseChecklist(
+        projData.releaseChecklist && Array.isArray(projData.releaseChecklist.sections)
+          ? projData.releaseChecklist
+          : { sections: [] }
+      )
 
       // Fetch Assigned Users
       const usersRes = await apiClient.get(`/api/projects/${projectId}/users`)

@@ -33,6 +33,7 @@ import {
   type ListScopeDeps,
 } from '@/lib/tenancy/list-scope'
 import { readBug, readTask, type BugReadDeps, type TaskReadDeps } from '@/lib/tenancy/item-access'
+import { projectReadAccess } from '@/lib/tenancy/project-guard'
 
 // Helper to get current IST time as Date object (for logic comparisons)
 const getISTDate = (date: Date = new Date()) => addMinutes(date, 330) // UTC + 5:30
@@ -312,6 +313,18 @@ async function assertCanModifyBug(actor: ResolverActor, bugId: string): Promise<
   }
 }
 
+/**
+ * Throw unless `actor` may manage this project. Same rule as the REST member
+ * routes (authz.canManageProject): a company admin of the project's company or
+ * the project's manager, with the tenant boundary applied first.
+ */
+async function assertCanManageProject(actor: ResolverActor, projectId: string): Promise<void> {
+  const { canManageProject } = await import('@/lib/authz')
+  if (!(await canManageProject(actor, projectId))) {
+    throw new Error('FORBIDDEN: You do not manage this project.')
+  }
+}
+
 /** Wires lib/tasks/task-access to the pool and lib/authz for updateTask / deleteTask. */
 async function taskAccessDeps(): Promise<TaskLookupDeps> {
   const { canEditWorkItem } = await import('@/lib/authz')
@@ -437,8 +450,15 @@ export const resolvers = {
       return projects
     },
 
-    projectUsers: async (_: any, { projectId }: any, { user }: any) => {
-      if (!user) throw new Error('Unauthorized')
+    projectUsers: async (_: any, { projectId }: any, context: any) => {
+      const actor = requireUser(context)
+      // Same tenant boundary as GET /api/projects/[projectId]/users: a session
+      // alone returned any company's member list.
+      const access = await projectReadAccess(actor, projectId)
+      if (!access.allowed) {
+        if (access.status === 404) return []
+        throw new Error(`FORBIDDEN: ${access.message}`)
+      }
       const result = await getPoolInstance().query(
         'SELECT * FROM project_users WHERE project_id = $1 ORDER BY assigned_at ASC',
         [projectId]
@@ -2486,26 +2506,27 @@ export const resolvers = {
     },
 
     // Project User Mutations
-    assignUserToProject: async (_: any, { projectId, employeeId, assignedBy }: any, { user }: any) => {
-      if (!user) throw new Error('Unauthorized')
-      if (user.role !== 'admin' && user.role !== 'top_management') {
-        throw new Error('Only admin or top_management can assign users to projects')
-      }
+    // Both took the global admin / top_management role as enough, in any company,
+    // and so let an admin of one company change another company's project members.
+    // They now follow POST and DELETE /api/projects/[projectId]/users.
+    assignUserToProject: async (_: any, { projectId, employeeId }: any, context: any) => {
+      const actor = requireUser(context)
+      await assertCanManageProject(actor, projectId)
 
+      // The assigner is the session; the schema's third argument is ignored, as
+      // the REST route ignores the same field in its body.
       await getPoolInstance().query(
         `INSERT INTO project_users (project_id, employee_id, assigned_by)
          VALUES ($1, $2, $3)
          ON CONFLICT (project_id, employee_id) DO UPDATE SET updated_at = NOW()`,
-        [projectId, employeeId, assignedBy]
+        [projectId, employeeId, actor.employeeId]
       )
       return true
     },
 
-    removeUserFromProject: async (_: any, { projectId, employeeId }: any, { user }: any) => {
-      if (!user) throw new Error('Unauthorized')
-      if (user.role !== 'admin' && user.role !== 'top_management') {
-        throw new Error('Only admin or top_management can remove users from projects')
-      }
+    removeUserFromProject: async (_: any, { projectId, employeeId }: any, context: any) => {
+      const actor = requireUser(context)
+      await assertCanManageProject(actor, projectId)
 
       await getPoolInstance().query(
         'DELETE FROM project_users WHERE project_id = $1 AND employee_id = $2',
