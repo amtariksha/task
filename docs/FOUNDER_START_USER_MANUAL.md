@@ -1,22 +1,23 @@
 # Karmayog — Founder Start: User Manual
 
-**Version:** 1.2.1  
-**Last Updated:** 2026-10-05  
+**Version:** 1.3  
+**Last Updated:** 2026-10-10  
 **For:** Founder (AM-0001) and platform admins  
-**App version:** mobile 1.3.0 (build 21)
+**App version:** mobile 1.4.0 (build 22)
 
 ---
 
 ## Changelog
+- **2026-10-10 (1.3)**: Re-baselined on mobile 1.4.0 (build 22) and the current web app. The manual now describes the app as it is today, and everything that differs in an older version is in one table, [If you are on an older version](#if-you-are-on-an-older-version). New sections: [Brain Dump](#brain-dump) and [Offline on mobile](#offline-on-mobile) (what works without a connection, and the **System Maintenance** screen). Rewritten: [What's New in 1.4.0](#whats-new-in-140), [Security PIN](#security-pin) (a PIN can be set from the fix merged on 2026-10-06), [Getting Everything Out of Your Head](#getting-everything-out-of-your-head) (projects and tasks now work on the phone), [Start is missing](#start-is-missing) (the founder check is logged) and what an expired session does (the app signs you out). New for admins: [What you see in each company](#what-you-see-in-each-company), the requirements rule, the optional `EXPO_ACCESS_TOKEN`, the push setup guide, masked push tokens in the logs, [Server changes merged on 2026-10-05](#server-changes-merged-on-2026-10-05) and the code paths.
 - **2026-10-05 (1.2.1)**: What the earlier entries called "the next mobile build" is now named: mobile 1.4.0 (build 22).
-- **2026-10-05 (1.2)**: Updated for mobile 1.3.0 (build 21) and the current web app. New sections: [What's New in 1.3.0](#whats-new-in-130), [Security PIN](#security-pin), [Getting Everything Out of Your Head](#getting-everything-out-of-your-head), [Start is missing](#start-is-missing) (a step-by-step check) and [Companies, Roles, Secrets and Approvals](#companies-roles-secrets-and-approvals). Changed for 1.3.0: the rank screen asks before discarding, close-out text stops at 2000 characters, the Notifications row opens Start, the security PIN is optional, and a company switch reloads Start. Corrections: the in-app notification title, what an expired session does on mobile (the automatic sign-out on Start is not in 1.3.0), the migration 065 note, the cron check now in `proxy.ts`, and code paths.
+- **2026-10-05 (1.2)**: Updated for mobile 1.3.0 (build 21) and the current web app. New sections: What's New in 1.3.0 (replaced in manual version 1.3), [Security PIN](#security-pin), [Getting Everything Out of Your Head](#getting-everything-out-of-your-head), [Start is missing](#start-is-missing) (a step-by-step check) and [Companies, Roles, Secrets and Approvals](#companies-roles-secrets-and-approvals). Changed for 1.3.0: the rank screen asks before discarding, close-out text stops at 2000 characters, the Notifications row opens Start, the security PIN is optional, and a company switch reloads Start. Corrections: the in-app notification title, what an expired session does on mobile (the automatic sign-out on Start is not in 1.3.0), the migration 065 note, the cron check now in `proxy.ts`, and code paths.
 - **2026-09-17 (1.1)**: Review corrections: weekday names in the examples, parked-thread labels, thread deletion, deleted projects, push timing and failure checks, nested repos in the machine scripts, token setup, first-morning checklist, adding a founder and calling the API.
 - **2026-09-17**: First version of the Founder Start manual. Covers the mobile app (1.2.0, build 20), the web page at `/start`, the 09:00 IST push, the scripts on the founder's machine and admin setup.
 
 ---
 
 ## Table of Contents
-1. [What's New in 1.3.0](#whats-new-in-130)
+1. [What's New in 1.4.0](#whats-new-in-140)
 2. [What Start Is](#what-start-is)
 3. [Key Ideas](#key-ideas)
 4. [How the Top 3 Is Chosen](#how-the-top-3-is-chosen)
@@ -25,51 +26,63 @@
 7. [Daily Close-out](#daily-close-out)
 8. [Ranking Threads for the Week](#ranking-threads-for-the-week)
 9. [Managing Threads](#managing-threads)
-10. [Getting Everything Out of Your Head](#getting-everything-out-of-your-head)
-11. [The 09:00 Push](#the-0900-push)
-12. [Automatic Activity from Your Machine](#automatic-activity-from-your-machine)
-13. [Working with Claude](#working-with-claude)
-14. [FAQ](#faq)
-15. [Troubleshooting](#troubleshooting)
-16. [For Admins](#for-admins)
+10. [Brain Dump](#brain-dump)
+11. [Getting Everything Out of Your Head](#getting-everything-out-of-your-head)
+12. [The 09:00 Push](#the-0900-push)
+13. [Automatic Activity from Your Machine](#automatic-activity-from-your-machine)
+14. [Working with Claude](#working-with-claude)
+15. [FAQ](#faq)
+16. [Troubleshooting](#troubleshooting)
+17. [For Admins](#for-admins)
 
 ---
 
-## What's New in 1.3.0
+## What's New in 1.4.0
 
-Mobile 1.3.0 (build 21) is the current app. The web Start page is unchanged since the previous version of this manual.
+The current app is mobile 1.4.0 (build 22). This manual describes it, and the web app, as they are today. To see which version is on your phone, open the drawer and tap **Account**: the last line, under **Logout**, reads **Version** and the number. On the current app it is **Version 1.4.0**.
 
-### Start
+| New in 1.4.0 | What you see |
+|--------------|--------------|
+| **Brain dump** | On Start, **⋮** → **Brain dump**: type, dictate or paste everything in your head, one thought per line, check the rows and save them all as threads in one go. The text is kept as a draft until it is saved. See [Brain Dump](#brain-dump). |
+| An expired session signs you out | When your session runs out, the app shows the sign-in screen by itself, on Start as well as on Feed, Notifications and Attendance. Sign in again with OTP. See [Opening Start](#opening-start). |
+| The founder check is logged | When the phone cannot confirm that you are a founder, the reason is listed in **Debug Menu** → **Logs**. When the server says yes but the phone cannot store the answer, Start still appears. See [Start is missing](#start-is-missing). |
+| Projects on the phone | **Add New Project** and **Create Sub-Project** say **Project created successfully** and **Subproject created successfully** when the project is created. |
+| **Create Task** on the phone | **Project \*** lists your real projects, and **Subproject** lists only that project's sub-projects. |
+| **Rank threads** | **Save** shows **Ranks saved** and goes straight back to Start. |
 
-| Change | What you see |
-|--------|--------------|
-| **Rank threads** asks before discarding | If you changed the order and go back without saving, the app asks **Discard your new order?** (**Keep editing** or **Discard**). In 1.2.0 the new order was lost without a warning. See [Ranking Threads](#ranking-threads-for-the-week). |
-| Close-out text stops at 2000 characters | On mobile, **Next action**, **What happened** and **Waiting on** stop taking text at 2000 characters, the server's limit. A long close-out can no longer fail when you save it. No counter or message appears. |
-| The Notifications row opens Start | In **Notifications**, tapping the **Start · Wed 16 Sep** row now opens Start, as the push does. Other rows open the task, bug and so on that they refer to. |
-| The security PIN is optional | Sign-in no longer makes you set up a PIN. If you have set one, the lock screen asks for it right after you sign in. Without a PIN, the app never locks, and coming back to it leaves you where you were, so Start comes back on its own only on a new IST day or when the app restarts. Any PIN from an older version is deleted on the first launch. See [Security PIN](#security-pin). |
-| Switching company reloads Start | A company switch reloads every screen and lands you on Start. Start shows the same threads in every company. |
+One fix was merged on 2026-10-06, after the 1.4.0 version stamp: the security PIN can be set. It changed neither the version name nor the build number, so the code still says 1.4.0 (build 22). See [Security PIN](#security-pin).
 
-### Arriving in 1.4.0
+### If you are on an older version
 
-These are not in 1.3.0. They arrive with mobile 1.4.0 (build 22):
+This table is the one place where this manual describes older versions. Everywhere else it describes the app as it is now. 1.4.0 has two columns, and both are 1.4.0 (build 22): the fix merged on 2026-10-06 changed neither number. "Code of 2026-10-05" is a build made before that fix. "Current code" is a build made from the code as it is now, which includes it.
 
-- **⋮** → **Brain dump** (new): type or dictate everything in your head, one thought per line, check it and save it all as threads in one go. The text is kept as a draft until it is saved. See [Brain dump](#brain-dump-mobile-140).
-- An expired session on Start, Feed, Notifications or Attendance signs you out on its own. In 1.3.0 those screens just fail to load, so tap **Logout** in the drawer and sign in again.
-- A failed or empty founder check is recorded in **Debug Menu** → **Logs**, and the server's "you are a founder" answer is kept even when the phone cannot store it.
-- A sign-out happens only when the token the app currently holds is refused, and it runs only once.
-- **Add New Project** and **Create Sub-Project** report success when the project is created. In 1.3.0 they show **Failed to create project** (or **Failed to create subproject**) even then, so check **Projects** before trying again.
-- The **Project \*** list in **Create Task** shows your real projects, and the sub-project list shows only that project's sub-projects. In 1.3.0 it shows five built-in names that are not real projects, so create tasks on the web.
-- **Save** on **Rank threads** goes straight back after **Ranks saved**. In 1.3.0 it then asks **Discard your new order?**; tap **Discard**, the ranks are already saved.
+An app older than 1.2.0 (for example 1.1.9) has no Start at all: there is no **Start** in the drawer, and the 09:00 push opens **Notifications**.
 
-### Outside Start
+| What | 1.2.0 (build 20) | 1.3.0 (build 21) | 1.4.0 (build 22), code of 2026-10-05 | 1.4.0 (build 22), current code |
+|------|------------------|------------------|------------------|----------------|
+| **Brain dump** in the **⋮** menu | Not there. The menu has five items. Enter threads with the close-out (**+ new**) or **Add thread**. | Not there, as in 1.2.0 | Yes | Yes |
+| An expired session on Start, Feed, Notifications or Attendance | Those screens just fail to load. Start can show **UNAUTHENTICATED: You must be signed in.** Open **Home** or **Account**, or tap **Logout** in the drawer, and sign in again. | As in 1.2.0 | The app signs you out by itself | Same |
+| A founder check that fails | Leaves no trace in the app. If the phone cannot store the server's answer, Start stays hidden until a later check succeeds. | As in 1.2.0 | Listed in **Debug Menu** → **Logs**. Start still appears when only the storing failed. | Same |
+| **Add New Project** and **Create Sub-Project** | Show **Failed to create project** (or **Failed to create subproject**) even when the project was created. Check **Projects** before trying again, or you get a duplicate. | As in 1.2.0 | Report success | Same |
+| **Project \*** in **Create Task** | Lists five built-in names (**dsn**, **amtariksha**, **task management**, **swarg**, **other**), and the sub-project list three (**testing**, **development**, **reporting**). None is a real project. Create tasks on the web. | As in 1.2.0 | Lists your real projects and their sub-projects | Same |
+| **Save** on **Rank threads** | Goes straight back to Start | Then asks **Discard your new order?** Tap **Discard**: the ranks are already saved. | Goes straight back to Start | Same |
+| Leaving **Rank threads** with an unsaved order | The new order is lost with no warning | Asks **Discard your new order?** | As in 1.3.0 | As in 1.3.0 |
+| Close-out text boxes | Take more than 2000 characters. The save then fails with **\<field> must be at most 2000 characters.** | Stop at 2000 characters | As in 1.3.0 | As in 1.3.0 |
+| The **Start · \<date>** row in **Notifications** | Tapping it only marks it read. Use the push or the drawer. | Tapping it opens Start | As in 1.3.0 | As in 1.3.0 |
+| Security PIN: is it required? | Yes, at every sign-in. One PIN for everyone on the phone. **Logout** removes it. | No, it is optional. Each person has their own, and **Logout** keeps it. A PIN set in 1.2.0 is deleted the first time this version starts. | As in 1.3.0 | As in 1.3.0 |
+| Security PIN: can you set one? | Yes | **No.** **Save** on **Confirm New PIN** does nothing, no PIN is stored and the app never locks. | **No**, as in 1.3.0 | **Yes**, from the fix merged on 2026-10-06. If the phone cannot store the PIN you see **Could not save the PIN. Please try again.** |
+| Switching company | Only Settings refreshes. The drawer does not show a company. | Every screen reloads and you land on Start. The drawer shows your company when you belong to more than one. | As in 1.3.0 | As in 1.3.0 |
+| Project **Secrets** vault, the project role badge on member rows, and **Your own request — waiting for your manager.** on **Approvals** | Not there | Yes | Yes | Yes |
 
-Founders and platform admins also get these. None of them changes Start. Steps are in [Companies, Roles, Secrets and Approvals](#companies-roles-secrets-and-approvals).
+**Which build is on my phone?** The app shows the version name only, never the build number, and the build number would not settle it: a 1.4.0 build with the PIN fix and one without it both read **Version 1.4.0** and both carry build number 22. The only test is to set a PIN: if you see **Security PIN set**, the fix is in your build. This manual cannot know which version is on your phone or on the Play Store. Check the Version line on the phone and the Play listing.
 
-- **Company page** (web): **Admin** → **Company** shows the company you are working in. Platform admins add existing people there. Company admins can change members' roles and remove members, but cannot add existing people.
-- **Company split follow-up:** since 2026-09-29, Swarg (COMP-002) and Tattva Silicon (COMP-003) have their own projects, but nobody was moved. People must be added to those companies before those projects appear in their **Projects** list, and you must join them yourself before the Company page can show them.
-- **Project roles:** each project member is a manager, team leader or member, set on the project page (web) or Project details (mobile).
-- **Project secrets on mobile:** Project details → **Secrets** → **Open vault** shows names and reveals one value at a time after a fingerprint or face check. Adding and editing stay on the web.
-- **Approvals:** nobody can approve their own leave, WFH or attendance request, founders included.
+### On the web and the server
+
+These were merged on 2026-10-05. They do not depend on the app version: they apply to every phone and browser once the web app is deployed from that code. The web Start page itself is unchanged.
+
+- The web **Tasks** and **Development** lists show only the company you are working in, for everyone, platform admins and founders included. Opening a single task or bug, and reading a project's requirements, follow the company too. See [What you see in each company](#what-you-see-in-each-company).
+- Server logs no longer show full device push tokens, and the push can carry an optional `EXPO_ACCESS_TOKEN`. See [The daily push job](#the-daily-push-job).
+- Security clean-up on the server. See [Server changes merged on 2026-10-05](#server-changes-merged-on-2026-10-05).
 
 ---
 
@@ -81,7 +94,7 @@ Start is a screen in Karmayog that only founders can see. It helps you keep abou
 
 | When | What happens |
 |------|--------------|
-| Around 09:00 IST (between about 08:30 and 09:30) | A push titled **Start · Wed 16 Sep** (today's date) lists your Top 3. Tap it to open Start (mobile 1.2.0 or later). |
+| Around 09:00 IST (between about 08:30 and 09:30) | A push titled **Start · Wed 16 Sep** (today's date) lists your Top 3. Tap it to open Start. |
 | During the day | You work. Your Claude Code sessions, your git commits and your team's work in linked projects mark threads as touched on their own. |
 | End of day | A 60-second close-out: tap the threads you worked on and type each one's next step. |
 | Once a week | Rank your threads. Only ranked threads can enter the Top 3. Ranks stay until you save a new ranking or park the thread. Nothing clears them each week, and there is no reminder. |
@@ -92,13 +105,13 @@ All Start dates use Indian time (IST). For example, 18:31 UTC on 16 Sep is alrea
 
 The 09:00 push only goes out when you have at least one active thread. With none, the daily job sends nothing (it skips with `nothing-to-send`). On 17 Sep 2026 the live database had no active threads, only four parked test threads named "[gate-test] …" (not re-checked since). Do this before your first morning:
 
-1. Open https://task.amtariksha.com/start (or **Start** in mobile 1.3.0).
+1. Open https://task.amtariksha.com/start (or **Start** in the mobile app).
 2. Click **Close-out** → **+ new**. Type the label exactly as it appears as a value in `~/.config/karmayog/founder-map.json` (for example "Karmayog" or "Swarg"), then click **Add** and type the next action. Repeat for each thread, then click **Save (N)**. A new label in a close-out creates the thread, sets its next action and marks it touched in one step. The labels in this manual's examples, such as "Swarg menu", are only examples. If a label differs from the map, activity from your machine creates a second thread.
 3. Open **Rank threads**, rank the threads that matter and click **Save ranks** (**Save** on mobile). A thread needs both a rank and a next action to enter the Top 3.
 4. Check that the **Top 3** shows cards and that there is no grey **Paused until …** line.
 5. Leave the four "[gate-test]" parked threads parked. They are test data. Do not unpark them.
 
-For a long list of work, with projects and tasks as well as threads, see [Getting Everything Out of Your Head](#getting-everything-out-of-your-head).
+On the phone, **⋮** → **Brain dump** does step 2 for a whole list at once (see [Brain Dump](#brain-dump)). For a long list of work, with projects and tasks as well as threads, see [Getting Everything Out of Your Head](#getting-everything-out-of-your-head).
 
 ---
 
@@ -134,7 +147,7 @@ Days are counted by calendar date in IST, not by 24-hour periods. A thread touch
 
 | Who | How | Recorded as |
 |-----|-----|-------------|
-| You | Saving a close-out entry for the thread (even without a new next action) | `closeout` |
+| You | Saving a close-out entry for the thread (even without a new next action), or a [Brain dump](#brain-dump) row for it | `closeout` |
 | Anyone using the API | Changing the next action with `updateFounderResumePoint` (see [For Admins](#for-admins)) | `manual` |
 | Your machine | A Claude Code session or your git commits in a mapped repo (see [Automatic Activity](#automatic-activity-from-your-machine)) | `hook` |
 | Your team | Task or bug activity (including sub-projects) in the linked project in the last 24 hours, if newer than the current touch. It is saved when Start is loaded, or when the 09:00 job runs and builds the push (not while the push is turned off or paused, or after today's push was already sent). | `karmayog` |
@@ -149,7 +162,7 @@ Each check-in has a **kind** (`closeout`, `activity`, `rank`, `start`) and a **s
 
 | Check-in | Written by |
 |----------|------------|
-| `closeout` · `app` | You, one per thread in each close-out |
+| `closeout` · `app` | You, one per thread in each close-out or Brain dump save |
 | `activity` · `hook` | Your machine (Claude Code sessions, nightly git scan) |
 | `rank` · `app` | You, each time you save a ranking. The note lists the labels in order, like "Karmayog > Swarg", or "(all unranked)". |
 | `start` · `app` | The server, when the 09:00 push goes out (a text copy of that day's Start) |
@@ -194,7 +207,7 @@ Swarg menu has a better rank than Investor deck, but it is fresh, so the two sta
 
 ### "Not today"
 
-**Not today** on a Top 3 card moves that card to the bottom of the Top 3 on your screen. The thread you marked last goes last. Nothing is saved to the server, and the order only changes on that device or browser page. The marks are dropped when the date changes, when you reload the web page, and on mobile when the app restarts, when you switch company, or when you unlock it with your security PIN (only if you set one).
+**Not today** on a Top 3 card moves that card to the bottom of the Top 3 on your screen. The thread you marked last goes last. Nothing is saved to the server, and the order only changes on that device or browser page. The marks are dropped when the date changes, when you reload the web page, and on mobile when the app restarts, when you switch company, when you unlock it with your security PIN (only if you set one), or when the **System Maintenance** screen has taken over (see [Offline on mobile](#offline-on-mobile)).
 
 ---
 
@@ -208,19 +221,22 @@ Swarg menu has a better rank than Investor deck, but it is fresh, so the two sta
 - The server decides who is a founder, from the `FOUNDER_EMPLOYEE_IDS` server setting and the platform-admin flag in the database, never from your login token. Anyone else is turned away and never sees founder data. The 09:00 push goes only to founders whose user status is active.
 - The company does not matter. A **Company admin** on the Company page is not a founder, and switching company does not remove Start.
 
-### On mobile (1.3.0)
+### On mobile
 
-- **Check the version first:** open the drawer and tap **Account** (or **Settings**). The bottom of the screen, under **Logout**, shows **Version 1.3.0**. No build number is shown. Start needs 1.2.0 or later. The Play Store copy can be older: 1.1.9 has no Start, so neither a drawer item nor the push can open it. To install 1.3.0 (build 21) of Karmayog (`com.karmayog`), see [Start is missing](#start-is-missing). Ignore the **Version** row in the drawer's **Debug Menu**: it shows the Android API level, not Karmayog's version.
-- **After login:** Home shows first, and Start takes over once the server confirms you are a founder, which needs a connection. This happens after every sign-in, because **Logout** and a fresh install both clear the stored founder flag. No PIN screen comes first unless you set a PIN. With a PIN, the lock screen comes first and you land on Start after unlocking. When the app restarts while you are still signed in, it opens straight on Start.
+- **Check the version first:** open the drawer and tap **Account** (or **Settings**). The bottom of the screen, under **Logout**, shows **Version** and the number (**Version 1.4.0** on the current app). No build number is shown. Start needs 1.2.0 or later. A Play Store copy can be older: the Play release in early October 2026 was 1.1.9, which has no Start, so neither a drawer item nor the push can open it. If your version is lower than 1.4.0, see [If you are on an older version](#if-you-are-on-an-older-version). To install a newer build of Karmayog (`com.karmayog`), see [Start is missing](#start-is-missing). Ignore the **Version** row in **Debug Menu** → **Info**: it shows the Android API level, not Karmayog's version.
+- **After login:** Home shows first, and Start takes over once the server confirms you are a founder, which needs a connection. This happens after every sign-in, because **Logout** and a fresh install both clear the stored founder answer. No PIN screen comes first unless you set a PIN. With a PIN, the lock screen comes first and you land on Start after unlocking. When the app restarts while you are still signed in, it opens straight on Start.
 - **With a security PIN:** the lock screen appears right after sign-in and whenever you come back after 5 minutes or more away. After you unlock, you land on Start, and any screens you had opened on top are closed. See [Security PIN](#security-pin).
 - **Without a PIN:** coming back to the app on the same IST day leaves you on the screen you were on. Start comes back on its own only on a new IST day (see **Next morning**) or when the app restarts.
 - **From the drawer:** open the menu (hamburger) and tap **Start**. It is the first item, above **Home**, right under your name, role and employee ID. If you belong to more than one company, a small chip there shows the company you are working in.
 - **From the push:** tap the 09:00 notification.
-- **From Notifications:** tap the bell, then the **Start · Wed 16 Sep** row. New in 1.3.0.
-- **Back to the normal app:** tap **⋮** then **Home**, or open the drawer and tap **Home**. Start stays open underneath: the Android back button on Home takes you back to Start.
-- **Next morning:** if you bring the app back on a new IST day, it shows today's Start and closes any screens you had opened on top. If Start or **Rank threads** is already open, or you opened the app from a notification, it reloads today's Start in place instead, so an open close-out or unsaved rank changes are kept. Tapping the Start notification still takes you to Start, so with unsaved changes on **Rank threads** you are first asked **Discard your new order?**.
-- The app remembers you are a founder, so it still opens on Start when you are offline. It checks again whenever you come back to the app. If you stop being a founder, Start and its drawer item disappear.
+- **From Notifications:** tap the bell, then the **Start · Wed 16 Sep** row. The row is marked read and Start opens.
+- **Back to the normal app:** tap **⋮** then **Home**, or open the drawer and tap **Home**. Start stays open underneath. From Home, the Android back button first moves to the **Feed** tab; press it again to come back to Start (or open the drawer and tap **Start**). The parked list and your **Not today** marks are as you left them.
+- **Next morning:** if you bring the app back on a new IST day, it shows today's Start and closes any screens you had opened on top. If Start, **Rank threads** or **Brain dump** is the screen on show, or you opened the app from a notification, it reloads today's Start in place instead, so an open close-out, unsaved rank changes or a brain dump are kept.
+- **The Start notification while another Start screen is open:** tapping it takes you back to Start. From **Rank threads** with unsaved changes you are first asked **Discard your new order?**. From **Brain dump** you go back without a question (unless a save is running, which asks **Still saving**), and the draft is kept.
+- **The app remembers you are a founder**, so it still opens on Start when you are offline. Offline, Start stays readable for only about half a minute (see [Offline on mobile](#offline-on-mobile)). It asks the server again at sign-in, each time the app restarts, each time you come back to it and after a company switch. When it gets no answer it keeps the stored one and notes why in **Debug Menu** → **Logs** (see [Start is missing](#start-is-missing)). If you stop being a founder, Start, **Rank threads**, **Brain dump** and the drawer item disappear.
 - **Switching company:** drawer → **Account** → tap the **Company** row (it shows the current company and ▾) → in the **Switch company** sheet, tap the company. The row shows only when you belong to two or more companies. The switch reloads every screen and puts you back on Start. Start shows the same threads in every company. It also clears **Not today** marks and closes the parked list.
+- **When your session expires:** sessions last 7 days. When the server refuses a request because your session has run out, the app signs you out by itself and shows the sign-in screen. No message explains it. If a save set it off, that save's red error toast, **UNAUTHENTICATED: You must be signed in.**, can show for up to 3 seconds as the sign-in screen appears. This happens on Start (loading it, refreshing it or saving from it) as well as on the other screens. Sign in again with OTP: Home shows first, and Start takes over after the founder check. A request that only overlapped a sign-in, a sign-out or a company switch does not sign you out, and neither does a **FORBIDDEN** answer (signed in, but not allowed).
+- **What a sign-out keeps:** any sign-out, **Logout** or the automatic one, keeps your security PIN and your Brain dump draft. It clears the stored founder answer, the saved project filter and the data cached on the phone. A close-out you were typing when the automatic sign-out happens is lost, because it exists only on screen. Unsaved rank changes are lost the same way.
 
 ### On the web
 
@@ -234,15 +250,16 @@ While the page checks your access, you see a spinner. If you are not signed in, 
 
 ### Security PIN
 
-The security PIN locks the mobile app. It is optional in 1.3.0: sign-in no longer makes you create one. If you have set one, it is asked for right after you sign in.
+The security PIN locks the mobile app. It is optional: sign-in does not make you create one, and without one the app never locks. If you have set one, it is asked for right after you sign in.
 
-- **Known problem in 1.3.0 and 1.4.0:** setting a PIN does not work. After **Save** on **Confirm New PIN** nothing happens and no PIN is stored, so the app never locks. The build after 1.4.0 fixes it.
-- **Turn it on:** drawer → **Account** → **App Settings** → **Security PIN**. Without a PIN the row reads **Off. Turn it on to lock the app when you leave it.** Tap **Set up**, type 4 digits under **Enter New PIN** and tap **Next**, then type them again under **Confirm New PIN** and tap **Save**. You see **Security PIN set**.
+- **Turn it on:** drawer → **Account** → **App Settings** → **Security PIN**. Without a PIN the row reads **Off. Turn it on to lock the app when you leave it.** Tap **Set up**, type 4 digits under **Enter New PIN** and tap **Next**, then type them again under **Confirm New PIN** and tap **Save**. You see **Security PIN set**. If the phone cannot store the PIN, the dialog stays open and says **Could not save the PIN. Please try again.**
+- **If nothing happens after Save,** your build does not have the fix merged on 2026-10-06 and cannot store a PIN, so the app never locks. A 1.4.0 build with the fix and one without it both read **Version 1.4.0** and both carry build number 22, so trying it is the only test. See [If you are on an older version](#if-you-are-on-an-older-version).
 - **With a PIN** the row reads **The app asks for this PIN after 5 minutes in the background.** It has two buttons. **Change** asks for the current PIN first. **Turn off** asks only **Turn off the security PIN?**, not for the PIN, so anyone holding your unlocked phone can turn it off.
 - **When it locks:** when you come back after 5 minutes or more away (from the background, or reopening a closed app) and right after you sign in. The lock screen is titled **App Locked**. If you switched on biometric login in Settings (for example **Fingerprint Login**), you can also tap **Unlock with Fingerprint**.
+- **After you unlock** you land on Start. Screens that were open on top are closed, **Not today** marks are cleared and the parked list is closed. A close-out you were typing and unsaved rank changes are lost, without a question. A Brain dump you were writing is not lost: its draft was saved when the app went to the background.
 - **It belongs to you on this phone.** **Logout** does not remove it, and someone else signing in on the same phone does not get it.
-- **After the upgrade:** 1.3.0 deletes any PIN set in an older version on its first launch. Uninstalling the app deletes it too. Set it up again if you want the lock.
-- **Forgot it:** on the lock screen tap **Forgot PIN? Sign out**, then **Sign out**. This deletes your PIN and signs you out. Sign in again with OTP. The dialog says you will need to set a new PIN, but in 1.3.0 that is optional.
+- **What removes it:** **Turn off**, **Forgot PIN? Sign out**, and uninstalling the app. A PIN set in 1.2.0 is also deleted the first time a newer version starts. Set it up again if you want the lock.
+- **Forgot it:** on the lock screen tap **Forgot PIN? Sign out**, then **Sign out**. This deletes your PIN and signs you out. Sign in again with OTP. The dialog says you will need to set a new PIN, but that is optional.
 
 ---
 
@@ -253,15 +270,18 @@ The security PIN locks the mobile app. It is optional in 1.3.0: sign-in no longe
 | Part | Mobile | Web |
 |------|--------|-----|
 | Heading | **START · Wed 16 Sep** (the IST date) | Same |
-| Actions | **Close-out** button at bottom right; **⋮** menu (**More Start options**) in the header | Toolbar: **Close-out**, **Rank threads**, **Add thread**, **Show parked**, **Refresh** |
+| Actions | **Close-out** button at bottom right; **⋮** menu at the right of the header | Toolbar: **Close-out**, **Rank threads**, **Add thread**, **Show parked** (**Hide parked** while the list is open), **Refresh** |
 | Refresh | Pull down on the screen | **Refresh** button (**Refreshing…** while it runs) |
 | Messages | Short pop-up toast for 3 seconds | Green (success) or red (error) box under the toolbar |
 | Pause | **⋮** → **Pause Start until…** | **Pause Start push** section on the page |
+| Brain dump | **⋮** → **Brain dump** | Not on the web |
 | Out-of-date warning | Banner under the heading | Amber banner |
 
-The mobile **⋮** menu holds, in order: **Rank threads**, **Show parked** (or **Hide parked**), **Pause Start until…**, **Add thread**, **Home**. The header also has the usual project filter, light/dark toggle and notification bell. The project filter does not change what Start shows.
+The mobile **⋮** menu holds six items, in this order: **Rank threads**, **Show parked** (it reads **Hide parked** while the parked list is open), **Pause Start until…**, **Add thread**, **Brain dump**, **Home**. The button has no printed name; a screen reader calls it "More Start options".
 
-Top to bottom, the web page shows: heading, toolbar, status message, **Add thread** box (when open), out-of-date banner, close-out warning, paused line, **Pause Start push**, **Top 3**, **Other threads**, **Waiting on you**, **Claude's notes** and **Parked threads** (when shown). Mobile uses the same order for the thread sections, with section titles in capitals (**TOP 3**, **OTHER THREADS** …).
+The mobile header shows, left to right: the hamburger button, the title **Start**, the project filter (a folder icon that opens **Filter Projects**), the light/dark toggle, the notification bell and **⋮**. The project filter does not change what Start shows.
+
+Top to bottom, the web page shows: heading, toolbar, status message, **Add thread** box (when open), out-of-date banner, close-out warning, paused line, **Pause Start push**, **Top 3**, **Other threads**, **Waiting on you**, **Claude's notes** and **Parked threads** (when shown). Mobile uses the same order for the thread sections. On both, the section titles are shown in capitals (**TOP 3**, **OTHER THREADS** …); this manual writes them as **Top 3**, **Other threads** and so on. On the web the same goes for the **Add thread** and **Pause Start** box titles and for **Unranked** in the rank dialog.
 
 ### Warning lines under the heading
 
@@ -285,6 +305,24 @@ Start first shows the last copy it loaded, then fetches a fresh one. If the fres
 The web page reloads itself shortly after IST midnight. It also reloads when you come back to the tab and the date has changed.
 
 If nothing could be loaded at all, you see the error (for example **Could not load Start.**) and a **Retry** button.
+
+### Offline on mobile
+
+Whenever the phone has no connection, the app shows its own banner at the top of every screen, Start included: **You're offline**, with **Some features may be limited** under it. It is separate from Start's banners above and can show for a moment when they do not.
+
+For the first half minute or so offline, you can still read Start, and **Not today** still works because it never leaves the phone. Nothing else can be saved, and nothing is kept to send later:
+
+| Where | What you see offline |
+|-------|----------------------|
+| Close-out | **Offline — close-out needs a connection**. **Save** is disabled. |
+| **Rank threads** | Opened while offline: the load error (or **Could not load threads**) with **Retry**, and no list. If the connection drops after the list loaded: **You are offline. Connect to save ranks.** and **Save** is disabled. |
+| **Add thread** | **You are offline — connect to add a thread.** |
+| **Pause Start until…** | **You are offline — connect to change the pause.** **Pick date** and **Clear pause** are disabled. |
+| **Brain dump** | You can write and review. **Save** is disabled with **Offline — Brain dump needs a connection to save. Your draft is kept.** |
+| Parked list | **Unpark** is disabled, with no message |
+| **Park** on a card or row | The button is not disabled. The attempt fails with an error toast and the thread stays where it is. |
+
+**After about half a minute the whole app is replaced.** The app checks the server every 30 seconds. After two failed checks in a row (30 to 60 seconds with no connection, or with the server down), every screen gives way to a **System Maintenance** screen with a **Retry Connection** button, and Start cannot be read. When the connection is back, tap **Retry Connection** or wait for the next check: the app reloads and you land on Start. **Not today** marks, the open parked list, an open close-out and unsaved rank changes are gone. A Brain dump draft is kept.
 
 ### Top 3
 
@@ -310,7 +348,7 @@ Opening a row shows the full next action and "waiting on" text, team activity an
 
 ### Waiting on you
 
-Up to 5 items that need you. The section is hidden when there are none. It covers tasks and bugs in every company (Amtariksha, Swarg and Tattva Silicon), whichever company you are working in.
+Up to 5 items that need you. The section is hidden when there are none. It covers tasks and bugs in every company (Amtariksha, Swarg and Tattva Silicon), whichever company you are working in. The web **Tasks** and **Development** lists show only the company you are working in, so on the web this is the one place where you see every company's tasks and bugs without switching. On the phone, **Tasks**, **Your Work** and Home also list your own tasks from every company (see [What you see in each company](#what-you-see-in-each-company)).
 
 - **Open tasks** where you are an assignee or on the support list, due today, tomorrow or the day after. Overdue tasks are included. Tasks with no due date are not.
 - **Open bugs** assigned to you, whatever their due date.
@@ -320,11 +358,11 @@ Items are sorted by due date, earliest first. Bugs with no due date come last, t
 
 ### Claude's notes
 
-A folded panel with a robot icon and the time it was written. It only appears on days when Claude has written your daily brief (see [Working with Claude](#working-with-claude)). Open it to read the note in a fixed-width font, with "Check-in at \<time>" underneath. The time uses your device's time zone and format, for example 08:45 or 8:45 AM. On mobile you can select and copy the text.
+A folded panel with a robot icon and the time it was written. It only appears on days when Claude has written your daily brief (see [Working with Claude](#working-with-claude)). Open it to read the note in a fixed-width font, with "Check-in at \<time>" underneath. The time uses your device's time zone and format, for example 08:45 or 8:45 AM. On mobile you can select and copy the text. A note with no text shows **No note text.**
 
 ### Parked threads
 
-Tap **Show parked** (mobile: in the **⋮** menu) to add a **Parked threads** list at the bottom. Each row shows the label, the next action and an **Unpark** button. If there are none: **No parked threads** on mobile, **No parked threads.** on the web. On mobile the parked list stays open until you hide it, the app restarts, you switch company, or the app locks (only with a security PIN). Coming back from Home keeps it open.
+Tap **Show parked** (mobile: in the **⋮** menu) to add a **Parked threads** list at the bottom. Each row shows the label, the next action (or **no next action**) and an **Unpark** button. If there are none: **No parked threads** on mobile, **No parked threads.** on the web. To hide the list again, use **Hide parked** in the same place. On mobile the parked list stays open until you hide it, the app restarts, you switch company, the app locks (only with a security PIN), or the **System Maintenance** screen takes over. Coming back from Home keeps it open. Offline on mobile, **Unpark** is disabled.
 
 ---
 
@@ -340,6 +378,8 @@ A close-out tells Start what you worked on today and what comes next. For each t
 
 The whole close-out saves together or not at all. You can include 1 to 50 threads at a time.
 
+On the phone, a [Brain dump](#brain-dump) save is a close-out too: it writes the same `closeout` check-ins, for a whole list at once.
+
 ### On mobile
 
 1. Tap the **Close-out** button at the bottom right of Start. The **Close out** sheet opens: "Tap what you touched, then set each next step."
@@ -347,7 +387,7 @@ The whole close-out saves together or not at all. You can include 1 to 50 thread
 3. Type the next physical step. The grey hint shows the current next action, or **One physical step** if there is none. Leave it blank to keep the current one.
 4. Optional: tap **+ details** to fill **What happened** and **Waiting on**. **Waiting on** starts with the current value. Empty it to remove it.
 
-   In 1.3.0, **Next action**, **What happened** and **Waiting on** each stop taking text at 2000 characters, the server's limit. No counter or message appears. Typing just stops.
+   **Next action**, **What happened** and **Waiting on** each stop taking text at 2000 characters, the server's limit. No counter or message appears. Typing just stops.
 5. For work that is not a thread yet, tap **+ new**, type the label under **New thread** and tap **Add**. The new chip shows as "\<label> (new)" and is selected. If the label matches an active thread (ignoring capitals), that thread is selected instead. A label that matches a parked thread still shows as "\<label> (new)", but saving updates the parked thread and creates nothing (see [Parking and unparking](#parking-and-unparking)).
 6. Tap **Save (N)**. You see **Close-out saved**, the sheet closes and Start reloads.
 
@@ -385,10 +425,11 @@ You can tap the next chip while the keyboard is still open.
 | | Mobile | Web |
 |---|--------|-----|
 | Close with nothing typed | Tap above the sheet, or press the Android back button | Press Escape or click the dark background |
-| Close after typing | Blocked. Only **Cancel** throws the text away. Opening **+ details**, adding a new thread, or text in a chip you have since unselected also counts as typing. | Blocked, with the message **You have typed a close-out. Use Cancel to discard it.** Selecting chips alone does not count as typing, but text in an unselected chip does. |
+| Close after typing | Blocked. Of the buttons and gestures, only **Cancel** throws the text away. Opening **+ details**, text in the **New thread** box, adding a new thread, or text in a chip you have since unselected also counts as typing. Selecting chips alone does not. | Blocked, with the message **You have typed a close-out. Use Cancel to discard it.** Selecting chips alone does not count as typing, but text in an unselected chip does. |
 | Always closes and discards | **Cancel** | **Cancel** or the **X** |
-| Offline | **Offline — close-out needs a connection**, and **Save** is disabled. Nothing is saved for later. | — |
-| Save fails | Error toast (for example **Could not save close-out**). The sheet stays open with your text. | Red message (for example **Could not save the close-out.**). The dialog stays open with your text. |
+| Text lost without a question | When the app locks (security PIN set, 5 minutes or more in the background), when the **System Maintenance** screen takes over, when the app signs you out, and when the app restarts. Unsaved rank changes are lost the same way. | When you reload or close the page |
+| Offline | **Offline — close-out needs a connection**, and **Save** is disabled. Nothing is saved for later. After about half a minute offline the **System Maintenance** screen takes over and the text is lost (see [Offline on mobile](#offline-on-mobile)). | — |
+| Save fails | The sheet stays open with your text and **Save** stops spinning. An error toast is shown (the server's message, or **Could not save close-out**), but it may be hidden behind the sheet. Check the connection and tap **Save (N)** again. | Red message (for example **Could not save the close-out.**). The dialog stays open with your text. |
 
 ---
 
@@ -403,11 +444,13 @@ A ranking gives your chosen threads ranks 1, 2, 3 … in order. **Every other ac
 3. Under **Unranked** (sorted alphabetically), tap the rank button to add a thread to the bottom of the ranked list. To rank a fresh list, tap the threads in priority order and no reordering is needed.
 4. Tap **Save** at the bottom. You see **Ranks saved** and return to Start, which reloads.
 
-Moving threads around changes nothing until you tap **Save**. Offline, the bar shows **You are offline. Connect to save ranks.**
+Moving threads around changes nothing until you tap **Save**. If the connection drops while the list is open, the bar shows **You are offline. Connect to save ranks.** and **Save** is disabled. If you open **Rank threads** while already offline, the list cannot load and you see only the error and **Retry**.
 
-To leave without saving, use the back arrow or the Android back button. If you changed the order, the app asks **Discard your new order?** ("The ranking has not been saved yet."). Tap **Keep editing** to stay with nothing lost, or **Discard** to leave without saving. If the order is the same as when you opened the screen (for example, you moved a thread and then moved it back), back leaves without asking. Tapping the Start notification while you have unsaved changes takes you to Start, so the same question appears. Other notifications open their task, bug and so on on top, and your unsaved order stays underneath.
+To leave without saving, use the back arrow or the Android back button. If you changed the order, the app asks **Discard your new order?** ("The ranking has not been saved yet."). Tap **Keep editing** to stay with nothing lost, or **Discard** to leave without saving. If the order is the same as when you opened the screen (for example, you moved a thread and then moved it back), back leaves without asking. After a successful **Save** the question does not appear. Tapping the Start notification while you have unsaved changes takes you to Start, so the same question appears. Other notifications open their task, bug and so on on top, and your unsaved order stays underneath.
 
-If **Discard your new order?** appears right after **Ranks saved**, your ranks are already saved. This is a bug in 1.3.0: tap **Discard**.
+The question is not asked, and the unsaved order is lost, when the app locks (security PIN set, 5 minutes or more in the background), when the **System Maintenance** screen takes over (see [Offline on mobile](#offline-on-mobile)), when the app signs you out, and when the app restarts.
+
+If saving fails you see the server's message or **Could not save ranks**, and you stay on the screen. If the list cannot load, you see the error (or **Could not load threads**) with **Retry**.
 
 ### On the web
 
@@ -415,9 +458,11 @@ If **Discard your new order?** appears right after **Ranks saved**, your ranks a
 2. Use the up and down arrows to reorder, the double-down arrow to unrank, and the double-up arrow (**Rank \<label>**) on an **Unranked** row to rank it at the bottom. Click them in priority order and no reordering is needed.
 3. Click **Save ranks**. The dialog closes, the page shows **Ranks saved.** and Start reloads.
 
-The second button reads **Close** until you change something, then **Cancel**. Both close without saving. Escape or a click on the background only closes the dialog when nothing has changed.
+The second button reads **Close** until you change something, then **Cancel**. Both, and the **X**, close without saving. Escape or a click on the background only closes the dialog when nothing has changed. On the web any change counts, even if you move the thread back.
 
-Other messages: **Nothing ranked yet. Rank a thread from the list below.** (no thread is ranked), **Every active thread is ranked.** (the Unranked list is empty) and **No active threads to rank.** (nothing to rank; **Save** is disabled).
+### Messages on both
+
+**Nothing ranked yet. Rank a thread from the list below.** (no thread is ranked), **Every active thread is ranked.** (the Unranked list is empty) and **No active threads to rank.** (nothing to rank; **Save**, or **Save ranks** on the web, is disabled).
 
 ---
 
@@ -430,8 +475,9 @@ Other messages: **Nothing ranked yet. Rank a thread from the list below.** (no t
 | Mobile | **⋮** → **Add thread** → type the **Label** (the counter shows **\<n>/120**) → **Add**. You see **Thread added**. |
 | Web | **Add thread** in the toolbar → type the **Thread label** → Enter or **Add**. You see **Thread added: \<label>**. The box stays open for the next one. Click **Add thread** again to hide it. |
 | Close-out | **+ new** (see [Daily Close-out](#daily-close-out)) |
+| Brain dump (mobile) | **⋮** → **Brain dump**: many threads in one save (see [Brain Dump](#brain-dump)) |
 
-A thread added with **Add thread** has no next action, no rank and has never been touched, so it shows **never ⚠** and stays in **Other threads**. Give it a next action in a close-out and rank it to get it into the Top 3. Adding it from a close-out marks it as touched straight away.
+A thread added with **Add thread** has no next action, no rank and has never been touched, so it shows **never ⚠** and stays in **Other threads**. Give it a next action in a close-out and rank it to get it into the Top 3. Adding it from a close-out or a Brain dump marks it as touched straight away.
 
 Labels must be unique across all threads, parked ones included, ignoring capitals. A second "karmayog" gives **A thread with this label already exists.** You get the same message when the label belongs to a parked thread, even though no such thread is visible on Start. Unpark that thread instead. Offline on mobile, the dialog shows **You are offline — connect to add a thread.**
 
@@ -445,9 +491,9 @@ After renaming a thread, update its label in `~/.config/karmayog/founder-map.jso
 
 ### Parking and unparking
 
-- **Park:** open a card or row and tap **Park**. You see **Parked \<label>** and Start reloads without it. The thread keeps its next action and "waiting on", but **its rank is removed**. Parked threads get no team-activity touches.
-- **Parking keeps the label taken.** Close-outs that use that label, and machine activity mapped to it, still go to the parked thread. It is marked touched and gets the check-in, but stays parked and hidden from Start. To work on it again, unpark it.
-- **Unpark:** open **Show parked** and tap **Unpark** next to the thread. It comes back **unranked**, so rank it again if it belongs in the Top 3. Mobile shows **Thread unparked**; the web shows **Unparked \<label>**.
+- **Park:** open a card or row and tap **Park**. You see **Parked \<label>** and Start reloads without it. The thread keeps its next action and "waiting on", but **its rank is removed**. Parked threads get no team-activity touches. If it fails you see the server's message or **Could not park the thread.**
+- **Parking keeps the label taken.** Close-outs and Brain dump rows that use that label, and machine activity mapped to it, still go to the parked thread. It is marked touched and gets the check-in, but stays parked and hidden from Start. Brain dump warns you about this before you save; the close-out does not. To work on the thread again, unpark it.
+- **Unpark:** open **Show parked** and tap **Unpark** next to the thread. It comes back **unranked**, so rank it again if it belongs in the Top 3. Mobile shows **Thread unparked**; the web shows **Unparked \<label>**. If it fails you see the server's message or **Could not unpark the thread.**
 
 Parking is how you retire a thread. A thread that has any check-in cannot be deleted: the database refuses with **Rows in founder_checkins are immutable (append-only audit table)**, because check-in history can never be changed. Only a thread with no check-ins (for example one added with **Add thread** and never touched) can be deleted.
 
@@ -455,7 +501,7 @@ Parking is how you retire a thread. A thread that has any check-in cannot be del
 
 Linking a thread to a Karmayog project lets your team's work count as touches and shows **team updates in 24h** on the card.
 
-- **Automatic link:** a thread created from a new label (close-out **+ new**, or activity from your machine) is linked when exactly one live project has that exact name (capitals ignored) and no other thread uses that project. Otherwise it starts unlinked. The link is only made when the thread is created, so create the project first. **Add thread** never links a project.
+- **Automatic link:** a thread created from a new label (close-out **+ new**, a Brain dump row, or activity from your machine) is linked when exactly one live project has that exact name (capitals ignored) and no other thread uses that project. Otherwise it starts unlinked. The link is only made when the thread is created, so create the project first. **Add thread** never links a project.
 - **Any company:** projects from every company count, so Swarg (COMP-002) and Tattva Silicon (COMP-003) projects can be linked and their team activity shows on Start.
 - **Team activity** includes the project and all its sub-projects: tasks and bugs updated in the last 24 hours, plus their activity-log entries in that window. Deleted tasks and bugs are skipped.
 - **One project, one thread.** Linking a project that another thread already uses gives **That project is already linked to another thread.** A missing or deleted project gives **Project not found.**
@@ -463,9 +509,150 @@ Linking a thread to a Karmayog project lets your team's work count as touches an
 
 ---
 
+## Brain Dump
+
+Brain dump turns a typed, dictated or pasted list into threads in one save. It is on the phone only: on Start, tap **⋮** → **Brain dump**. The web Start page has no Brain dump; there, use the close-out's **+ new**. Like the close-out, it makes and updates threads only, never projects or tasks.
+
+It has two steps, Write and Review. Nothing reaches the server until you tap **Save (N)** in Review.
+
+### Write
+
+The screen is titled **Brain dump** and opens on one large text box. When the box is empty, the keyboard opens by itself. Above the box is this hint: "One thought per line. Put its next action after -> (for example, Hiring -> Post job ad), or after : on a line with no arrow. When dictating, say “new line” between thoughts." The empty box shows a grey example:
+
+```text
+Hiring -> Post job ad
+Investor deck: Update traction slide
+GST filing
+```
+
+Type, paste or dictate one thought per line. Dictation means the microphone on your phone's keyboard. The app has no recorder of its own.
+
+| You write | You get |
+|-----------|---------|
+| `Hiring -> Post job ad` | Label **Hiring**, next action "Post job ad". `→` works like `->`. |
+| `Investor deck: Update traction slide` | Label **Investor deck**, next action "Update traction slide" |
+| `GST filing` | Label **GST filing**, no next action |
+| `Re: pricing -> call Ravi` | Label **Re: pricing**, next action "call Ravi". An arrow always wins over a colon. |
+| `Deck -> fix chart -> send` | Label **Deck**, next action "fix chart -> send". Only the first arrow splits. |
+| `Re: Investor email` | Label **Re**, next action "Investor email". With no arrow, the first colon splits. Fix the label in Review. |
+| `Standup at 10:30` or `Read https://…` | The whole line is the label. A colon splits only when a space follows it, or when it ends the line. |
+| `a->b` | The whole line is the label. An arrow splits only with a space on each side, or at the start or end of the line. |
+| `Hiring ->` or `Hiring:` | Label **Hiring**, no next action |
+| `-> call Ravi` | A row with no label. Review flags it **Needs a label**. |
+| `- Hiring`, `* Hiring`, `• Hiring`, `1. Hiring`, `1) Hiring` | Label **Hiring**. One bullet or list number at the start of a line is dropped. Other numbers stay, as in `2026 plan`. |
+
+Blank lines are ignored, and so is a line that holds only a bullet or only an arrow or colon. Extra spaces inside a label become one space, so a dictated or pasted label matches the typed one. A list pasted from another app works as it is.
+
+Under the box, on the left, is the count of thoughts: **0 thoughts**, **1 thought**, **12 thoughts**. On the right, while the box has text, is the draft line:
+
+| Draft line | Meaning |
+|------------|---------|
+| **Saving draft…** | The draft is being stored |
+| **Draft saved** | The draft is stored on the phone |
+| **Draft not saved on this phone — save before you leave** | The phone could not store the draft |
+| **Drafts can’t be kept on this phone — save before you leave** | The phone has nowhere to keep a draft |
+
+The button reads **Review (N)**. With no thoughts it reads **Review** and is disabled.
+
+### Review
+
+Tap **Review (N)**. Every thought becomes a numbered row. At the top is this hint: "Check each row, then save. Saved threads can be parked but not deleted, so fix dictation slips here. A row you remove is left out of this save and stays in your draft. New threads have no rank: rank them on ⋮ → Rank threads to fill your Top 3." The draft line from the Write step is shown here too.
+
+Each row has its number, its flags, a remove button (**×**), a **Label** box and a **Next action** box (both editable; the grey prompt in **Next action** is **One physical step**) and sometimes one line underneath, such as **Now: …**. A row that blocks the save has a red border.
+
+**Matching against your threads.** The app fetches your threads, parked ones included, fresh from the server every time **Brain dump** opens. Until the list arrives, Review shows **Checking which of these are already threads…** and the rows do not yet say **New thread**, **Already on Start** or **Parked**. If the list cannot be fetched, Review shows **Couldn’t load your threads to check for matches.** with a **Retry** button. If the retry fails too, a toast shows the error (or **Could not load threads**).
+
+| Flag | What Save does with the row |
+|------|-----------------------------|
+| **New thread** | Creates the thread, touched today. If exactly one project has exactly that name (ignoring capitals) and no other thread is linked to it, the new thread is linked to that project. |
+| **No next action — stays out of the Top 3 until it has one and a rank** | Shown next to **New thread**. The thread is still created, with no next action. |
+| **Already on Start — replaces its next action** | The label matches an active thread, ignoring capitals and extra spaces. Your next action replaces its current one, shown below as **Now: …** (**Now: no next action** when it has none). |
+| **Already on Start — nothing to save. Add a next action to update it.** | Left out of the save, so the thread is not marked touched for nothing. |
+| **Already on Start — same next action, nothing to save** | The thread already has this next action (ignoring capitals and spacing). Left out of the save, so a stale thread does not look fresh. |
+| **Parked — gets this next action but stays parked and hidden from Start** | Updates the parked thread, which stays parked. Underneath: "To see it on Start, unpark it from ⋮ → Show parked." |
+| **Parked — nothing to save. Add a next action to update it.** or **Parked — same next action, nothing to save** | Left out of the save. |
+| **Same label as row N — merged into it** | Rows with the same label (ignoring capitals and extra spaces) and at most one next action between them (ignoring capitals and spacing) are saved once, as row N: the row that has the next action, or the first of them if none has one. |
+| **Same label as row N with a different next action — edit a label or remove a row** (red) | Every row of that group turns red. Save is blocked until the rows no longer disagree: remove a row, change a label, or edit the next actions so that at most one different next action is left (the rows then merge). |
+| **Needs a label**, **Label is N characters — limit 120**, **Next action is N characters — limit 2000** (red) | Save is blocked until you fix the row. Unlike the close-out, these boxes do not stop your typing at the limit; they flag the row instead. |
+
+**Removing a row.** **×** leaves the row out of this save only. Its line stays in your draft as you first wrote it, not as you edited it in the row. There is no undo for a single row: to get removed rows back before saving, tap **Edit text** → **Undo changes**. With every row removed, the list reads **No rows left. Tap Edit text to add your thoughts.**
+
+**Going back to the text.** **Edit text** takes you back to the Write step. If you changed or removed rows, it first asks **Undo your changes to the rows?** ("Going back to the text undoes the edits and removals made here. The text is kept.") with **Keep reviewing** and **Undo changes**. Changes made to rows are never written back into the text, and typing in the text starts the Review again from the text.
+
+### Save
+
+The bottom bar has **Edit text** and **Save (N)**. N is the number of threads that will be sent. Four kinds of row are not sent:
+
+- a row that matches an existing thread and has no next action,
+- a row with the same next action the thread already has,
+- a duplicate merged into another row,
+- a row you removed with **×**.
+
+While **Save** is disabled, one line above the buttons says why. The first of these that applies is shown:
+
+| Line | Meaning |
+|------|---------|
+| **Nothing to save — tap Edit text to add your thoughts.** | No rows are left |
+| **Offline — Brain dump needs a connection to save. Your draft is kept.** | The phone is offline |
+| **Checking your threads…** | Your thread list is still loading |
+| **Couldn’t load your threads to check for matches. Tap Retry.** | Your thread list could not be loaded |
+| **Fix row 4 to save.**, **Fix rows 4 and 9 to save.** or **Fix rows 1, 2, 3, 4, 5 and 3 more to save.** | Those rows have a red flag |
+| **Nothing to save — every row is an existing thread with no new next action.** | Nothing is left to send |
+| **One save takes up to 50 threads and this has 53. Remove 3 to save; removed rows stay in your draft for the next save.** | More than 50 threads, counted after merging duplicates and leaving out rows with nothing to save |
+
+Tap **Save (N)**. This is what the save does:
+
+- **It is one close-out, all or nothing.** Either every row is saved or none is.
+- **New threads** are created by label, with their next action if they have one, and are touched today. They have no rank.
+- **Existing threads** get the new next action. A row is tied to the thread it was shown against, so it still updates that thread if the thread is renamed elsewhere before you tap **Save**. A parked thread is updated and stays parked.
+- **Waiting on and What happened are never sent**, so an existing thread keeps its "waiting on". Use the [close-out](#daily-close-out) to set them.
+- **It counts as your close-out.** Each saved row marks its thread touched and writes a `closeout` check-in, so the **No close-out since …** line on Start goes away.
+
+On success you see **Brain dump saved — N threads** (**1 thread** for one), plus **, N still parked** when some rows went to parked threads, plus **. N removed rows kept in your draft** when you removed rows. For example: **Brain dump saved — 12 threads, 1 still parked. 2 removed rows kept in your draft**. The screen closes and you are back on Start, which reloads.
+
+If the save fails, an error toast shows the server's message (or **Could not save the brain dump**). You stay in Review, nothing was saved and the draft still holds everything.
+
+Going back while it saves asks **Still saving** ("If you leave now, the save carries on. If it fails, your draft is still here.") with **Stay** and **Leave**. The rows cannot be edited during the save.
+
+**More than 50 threads?** Remove rows with **×** until **Save** is enabled and save. Then open **Brain dump** again: the removed lines are in the text, ready for a second save. The text box itself has no line limit.
+
+### The draft
+
+- **It is saved on the phone** about 0.7 seconds after each change, and at once when the app goes to the background or the screen closes.
+- **It holds the text and, if you were in Review, the rows as you edited them.** The next time you open **Brain dump** it comes back in the step you left. While it is being read, the screen shows only a spinner.
+- **One draft per person on this phone**, by employee ID, not per company. It stays after **Logout** and comes back when the same person signs in again.
+- **It is not encrypted.** It sits in the app's ordinary storage. **Debug Menu** → **Storage** shows its value only as **(hidden: Brain dump draft)**.
+- **A successful save replaces it:** with nothing, or with the lines of the rows you removed with **×**, back in the Write step. Delete them there once you no longer need them.
+- **A newer draft wins.** If you opened **Brain dump** a second time and changed the draft while a save was still running, the newer draft is kept.
+- **Emptying the text box** removes the stored draft.
+- **Uninstalling the app deletes it**, with the rest of the app's data on the phone. Nothing has reached the server before **Save (N)**, so save the brain dump or copy the text somewhere else before you uninstall.
+
+### If the app is interrupted
+
+| What happens | Brain dump |
+|--------------|------------|
+| You come back on a new IST day | Stays open. Start is refreshed underneath. |
+| The app locks (security PIN set, 5 minutes or more in the background) | The lock screen closes every screen, Brain dump included. The draft was saved when the app went to the background. Open **Brain dump** again after you unlock. |
+| The **System Maintenance** screen takes over (about half a minute offline, or the server is down) | Every screen closes, Brain dump included. The draft is kept. Open **Brain dump** again once the app is back. |
+| You switch company | Every screen reloads. The draft is kept. |
+| You tap the Start notification | You go back to Start without a question, unless a save is running (**Still saving**). The draft is kept. |
+| You sign out, or the app signs you out | The draft is kept for the next time you sign in on this phone. |
+
+### What Brain dump does not do
+
+- It does not create projects or tasks.
+- It does not rank. Rank the new threads on **⋮** → **Rank threads** to bring them into the Top 3.
+- It does not set **Waiting on** or **What happened**. Use the close-out.
+- It does not unpark a parked thread.
+- It cannot delete or undo a saved thread. Saving writes check-ins, and a thread with check-ins can be parked but not deleted, so fix dictation slips in Review.
+- It does not let you pick a project. A new thread is linked only by an exact, unique project-name match (see [Linking to a project](#linking-to-a-project)).
+- It is not on the web.
+
+---
+
 ## Getting Everything Out of Your Head
 
-Use this when you have a long list of work in your head and want all of it in Karmayog. Do it on the web, on a computer. Every step works there. On mobile you can only do the thread part.
+Use this when you have a long list of work in your head and want all of it in Karmayog. Every step works on the phone and on the web. Threads go in fastest on the phone, with Brain dump. Projects and tasks are quicker on the web when you have many.
 
 ### Thread, project or task?
 
@@ -485,66 +672,51 @@ How they connect:
 - Tasks never become threads. On Start, tasks appear only as rows in **Waiting on you** (open tasks where you are an assignee or on the support list, due by the day after tomorrow, overdue included, and open bugs assigned to you; only 5 rows show) and, by title, in the team-activity lines of an opened linked thread.
 - **How many threads:** Karmayog sets no limit. Keep about a dozen active, and rank only the 5 to 8 that should compete this week. A ranked thread you do not touch for 4 days goes stale and moves into the Top 3 ahead of fresher ones, so with 20 ranked threads the Top 3 fills with whatever is oldest. Leave the rest unranked, or park them.
 
+### What works where
+
+| Step | On the phone | On the web |
+|------|--------------|------------|
+| Many threads at once | **⋮** → **Brain dump**: type, dictate or paste the whole list, up to 50 threads per save. The fastest way. | **Close-out** → **+ new**, one thread at a time inside one save, up to 50. Or paste a prepared list through the browser console. |
+| **Waiting on** or **What happened** | **Close-out** → **+ details**. Brain dump cannot set them. | **Close-out** → **+ details** |
+| Ranking | **⋮** → **Rank threads** | **Rank threads** |
+| A project or sub-project | Works: **Projects** → **+**, and **Add Subproject** on **Project Details** | Works: **Admin** → **Projects** → **Add Project** |
+| People on a project | Works: **Project Details** → **Add User** | Works: project page → **Add User** |
+| One or two tasks | Works: **Create Task** | Works: **Create Task** |
+| Many tasks in a row | Slower. Both dates are typed by hand as YYYY-MM-DD, **End Date** does not follow **Start Date**, and every task starts from an empty form. | Better. The form has date pickers, **End Date** follows **Start Date**, and a bookmark can fill in the project and department. |
+
+### The fastest way, on the phone
+
+1. **Write the list down and sort it** into threads, projects and tasks.
+2. **Projects first**, and only those that do not exist yet. Open the drawer, tap **Projects** and check before adding one. Projects come first because a thread is linked to its project only at the moment the thread is created.
+   1. Tap the round **+** button at the bottom right. In **Add New Project**, fill **Project Name \***, leave **Parent Project (Optional)** on **None (Main Project)**, set **Status** (**Active** or **Inactive**) and tap **Create**. You see **Project created successfully** and the list reloads. The **+** button shows only when your global role is admin, top_management or management. The server makes the real decision: if you may not create projects in the company you are working in, you see **You do not have permission to create projects in this company.** If you have no **+**, use the web.
+   2. For a sub-project, open the main project and, in the **Sub-Projects** card, tap **Add Subproject**. In **Create Sub-Project**, fill **Subproject Name \*** and tap **Create**. You see **Subproject created successfully**. In **Add New Project**, **Parent Project (Optional)** lists only active main projects you are a member of, so **Add Subproject** is the surer way. Karmayog will not create a sub-project of a sub-project.
+   3. Add yourself and the team. On **Project Details**, in the **Assigned Team Members** card, tap **Add User**. In **Assign User to Project**, type in **Search User by Name/ID...** and tap the person. You see **User assigned successfully**. The list shows only the first 15 matches, so search by name. Creating a project adds nobody, not even you, and **Create Task** lists only main projects you are a member of. For a sub-project, add yourself and the team to its main project.
+   4. Give every project a different name. Karmayog allows two projects with the same name, but then a thread with that name is not linked automatically.
+
+   A new main project goes into the company you are working in (Amtariksha unless you switched). A sub-project always goes into its parent's company.
+3. **All threads in one Brain dump.** On Start, tap **⋮** → **Brain dump**. Write one line per thread: the label, then ` -> `, then the next step, for example `Hiring -> Post job ad`. For a thread that has a project, use exactly the project's name as the label. Tap **Review (N)**, check the rows, then tap **Save (N)**. One save takes up to 50 threads and creates each one with its next action, touched today. Details: [Brain Dump](#brain-dump).
+4. **Waiting on.** For a thread that someone else must move, tap **Close-out**, tap its chip, tap **+ details**, fill **Waiting on** and tap **Save (N)**.
+5. **Rank.** Tap **⋮** → **Rank threads**. Under **Unranked**, tap the rank button on each thread that should compete, in priority order. Tap **Save**. You see **Ranks saved**. See [Ranking Threads](#ranking-threads-for-the-week).
+6. **Tasks.** Open the drawer, tap **Tasks** and tap the **+** button (or **Dashboard** → **➕ Create Task**). Fill **Task Name \***, **Description \***, **Project \***, **Subproject** (shown only when the chosen project has sub-projects), **Priority \*** (nothing is chosen at first; without one, **Create Task** stops with **Please select priority**), **Status \*** (it starts as Open), **Assigned To \*** (only members of the chosen project; it starts as you), **Start Date \*** and **End Date \***, then tap **Create Task**. You see **Task created successfully**; **OK** takes you back. Check both dates before you save: they are typed as YYYY-MM-DD, **End Date** does not change when you change **Start Date**, and between midnight and 05:30 IST both start as yesterday's date. If **Project \*** says **No projects to choose from. Tasks can only be filed in projects you have been added to.**, add yourself to the project first (step 2). An open task assigned to you that is due within 2 days shows in **Waiting on you**. Assign to yourself only what you will do yourself.
+7. **Your machine.** If you use the [automatic activity](#automatic-activity-from-your-machine) scripts, make the labels in `~/.config/karmayog/founder-map.json` match the new thread labels exactly. A map label that matches no thread creates a new one.
+
+Do not use **⋮** → **Add thread** for a list. It closes after each thread, and each thread it makes has no next action, shows **never ⚠** and stays out of the Top 3 until a close-out gives it one (see [Adding a thread](#adding-a-thread)).
+
 ### The fastest way, on the web
 
 1. **Write the list down and sort it** into threads, projects and tasks.
 2. **Projects first**, and only those that do not exist yet. Check **Admin** → **Projects** before adding one.
-   1. Click **Add Project**. Fill **Project Name \***, leave **Parent Project (Optional)** empty for a main project, set **Status \*** and click **Create Project**. For a sub-project, open the parent project and click **Add Subproject**. Karmayog will not create a sub-project of a sub-project, so new projects go two levels deep at most (one existing Tattva Silicon branch is three deep: PRJ-051 → PRJ-049 → PRJ-050).
-   2. On the new project's page, under **Assigned Users**, click **Add User** and add yourself and the team. Creating a project adds nobody, and **Create Task** only lists projects you are assigned to. For a sub-project, add yourself and the team to its main project: **Create Task** lists only main projects you are a member of, and **Assign To** lists that main project's members whichever **Sub Project (Optional)** you pick.
+   1. Click **Add Project**. In **Add New Project**, fill **Project Name \***, leave **Parent Project (Optional)** empty for a main project, set **Status \*** and click **Create Project**. The dialog closes and the list reloads; it does not open the new project. For a sub-project, open the parent project and click **Add Subproject**. Karmayog will not create a sub-project of a sub-project, so new projects go two levels deep at most (one existing Tattva Silicon branch is three deep: PRJ-051 → PRJ-049 → PRJ-050).
+   2. Click **View Details** on the new project's row to open its page. Under **Assigned Users**, click **Add User** and add yourself and the team. The panel lists only the first 10 matches, so search by name or employee ID. Creating a project adds nobody, and **Create Task** only lists projects you are assigned to. For a sub-project, add yourself and the team to its main project: **Create Task** lists only main projects you are a member of, and **Assign To** lists that main project's members whichever **Sub Project (Optional)** you pick.
    3. Give every project a different name. Karmayog allows two projects with the same name, but then a thread with that name is not linked automatically.
 
    A new main project goes into the company you are working in (Amtariksha unless you switched). A sub-project always goes into its parent's company, so a sub-project of PRJ-037 Swarg Food is a Swarg project. Projects come first because a thread is linked to its project only at the moment the thread is created.
 3. **All threads in one close-out.** On Start, click **Close-out** → **+ new**. Type the label (exactly the project's name, if it has one) and press Enter. The chip **\<label> (new)** is selected and the cursor jumps to its **Next action** box. Type the next step. For work someone else must move, click **+ details** and fill **Waiting on (optional, clear to remove)**. Click **+ new** for the next item and repeat. Then click **Save (N)**. One save takes up to 50 threads and creates each one with its next action, touched today. A label that matches an active thread selects that thread instead. Details: [Daily Close-out](#daily-close-out).
 4. **Rank.** Click **Rank threads**. Under **Unranked**, click the double-up arrow (**Rank \<label>**) on each thread that should compete, in priority order. Click **Save ranks**. See [Ranking Threads](#ranking-threads-for-the-week).
-5. **Tasks.** **Work** → **Tasks** → **Create Task**. Fill **Task Name \*** (3 to 150 characters), **Task Description \***, **Project \***, **Department \***, **Priority \***, **Assign To \*** (only members of the main project), **Start Date \*** and **End Date \***, then click **Create Task**. Both dates start as today. Set **Start Date** first, then the real **End Date**: changing **Start Date** resets **End Date** to the same day. An open task assigned to you that is due within 2 days shows in **Waiting on you**. Assign to yourself only what you will do yourself. After each task the page goes back to the task list. To skip refilling the project and department each time, bookmark a link such as `https://task.amtariksha.com/tasks/create?projectId=<project ID>&department=<department>`.
+5. **Tasks.** **Work** → **Tasks** → **Create Task**. Fill **Task Name \*** (3 to 150 characters), **Task Description \***, **Project \***, **Department \***, **Priority \***, **Assign To \*** (only members of the main project), **Start Date \*** and **End Date \***, then click **Create Task**. Both dates start as today. Set **Start Date** first, then the real **End Date**: changing **Start Date** resets **End Date** to the same day. An open task assigned to you that is due within 2 days shows in **Waiting on you**. Assign to yourself only what you will do yourself. After each task the page goes back to the task list. That list shows only the company you are working in, and a task takes the company of its project, so a task you create in another company's project is not in the list you return to: switch company to see it. To skip refilling the project and department each time, bookmark a link such as `https://task.amtariksha.com/tasks/create?projectId=<project ID>&department=<department>`.
 6. **Your machine.** If you use the [automatic activity](#automatic-activity-from-your-machine) scripts, make the labels in `~/.config/karmayog/founder-map.json` match the new thread labels exactly. A map label that matches no thread creates a new one.
 
 Do not use **Add thread** for a list. Each thread it makes has no next action, shows **never ⚠** and stays out of the Top 3 until a close-out gives it one (see [Adding a thread](#adding-a-thread)). You can also ask Claude to do the close-out for you (see [Working with Claude](#working-with-claude)).
-
-### On mobile
-
-You need mobile 1.2.0 or later (1.3.0 is current). Use the phone for threads only:
-
-- **⋮** → **Brain dump** (mobile 1.4.0 and later): type or dictate the whole list, check it and save it in one go. See [Brain dump](#brain-dump-mobile-140) below.
-- **Close-out** (bottom right of Start) → **+ new** → type under **New thread** → **Add** → type the **Next action** → **+ new** for the next one → **Save (N)**. You see **Close-out saved**. It needs a connection.
-- **⋮** → **Rank threads** → tap the rank button on each **Unranked** row in priority order → **Save**.
-- **⋮** → **Add thread** closes after each thread and sets no next action. Use the close-out instead.
-
-Create projects and tasks on the web. Mobile 1.3.0 has two bugs here:
-
-- **Add New Project** shows **Failed to create project** even when the project was created. Check **Projects** before trying again, or you get a duplicate.
-- The **Project \*** list in **Create Task** shows only five built-in names (**dsn**, **amtariksha**, **task management**, **swarg**, **other**) instead of your projects. They are not real projects: a task filed under one of them belongs to no project. Do not use them.
-
-#### Brain dump (mobile 1.4.0)
-
-New in mobile 1.4.0; not in 1.3.0. Like the close-out, it makes threads only, never projects or tasks.
-
-1. On Start, tap **⋮** → **Brain dump**.
-2. **Write.** Type or dictate one thought per line. To give a thought its next action, put it after ` -> ` or ` → `, for example `Hiring -> Post job ad`. On a line with no arrow, `: ` works too, as in `Investor deck: Update traction slide`. An arrow always wins over a colon, so `Re: pricing -> call Ravi` gives the label **Re: pricing**, and only the first arrow splits. Without an arrow, the first `: ` splits, so `Re: pricing` gives the label **Re** (fix it in the next step). A colon with no space after it, as in `10:30` or `https://…`, does not split. Extra spaces inside a label are dropped. Bullets at the start of a line (`- `, `* `, `• `, `1. `, `1) `) and blank lines are ignored. When dictating, say "new line" between thoughts. Under the box you see the count (**12 thoughts**) and **Saving draft…** or **Draft saved**.
-3. Tap **Review (N)**. Each row has a number, its **Label** and **Next action** (both editable), a remove button (**×**) and one or more flags. **×** leaves the row out of this save; its line stays in your draft (see step 4).
-
-   | Flag | What Save does with the row |
-   |------|-----------------------------|
-   | **New thread** | Creates the thread, touched today. If exactly one project has exactly that name (ignoring capitals) and no other thread is linked to it, the new thread is linked to that project. |
-   | **No next action — stays out of the Top 3 until it has one and a rank** | The new thread is still created, with no next action. |
-   | **Already on Start — replaces its next action** | The label matches an active thread, ignoring capitals and extra spaces. Your next action replaces its current one, shown below as **Now: …**. |
-   | **Already on Start — nothing to save. Add a next action to update it.** | Left out of the save, so the thread is not marked touched for nothing. |
-   | **Already on Start — same next action, nothing to save** | The thread already has this next action (ignoring capitals and spacing). Left out of the save, so a stale thread does not look fresh. |
-   | **Parked — gets this next action but stays parked and hidden from Start** | Updates the parked thread, which stays parked. To see it on Start, unpark it from **⋮** → **Show parked**. |
-   | **Parked — nothing to save. Add a next action to update it.** or **Parked — same next action, nothing to save** | Left out of the save. |
-   | **Same label as row N — merged into it** | Rows with the same label (ignoring capitals and extra spaces) and at most one next action between them (ignoring capitals and spacing) are saved once, as row N: the row that has the next action, or the first of them if none has one. |
-   | **Same label as row N with a different next action — edit a label or remove a row** (red) | Save is blocked until you remove a row or change a label. |
-   | **Needs a label**, **Label is N characters — limit 120**, **Next action is N characters — limit 2000** (red) | Save is blocked until you fix the row. |
-
-4. Tap **Save (N)**. N is the number of threads that will be saved, after merging and leaving out rows with nothing to save. While a row is red, **Save** is disabled with **Fix row 4 to save.** (or **Fix rows 4 and 9 to save.**). A row flagged as an existing thread updates that thread, even if it is renamed on the web before you tap **Save**. You see **Brain dump saved — N threads** (plus **, N still parked** if some went to parked threads, and **. N removed rows kept in your draft** if you removed rows with **×**) and are back on Start. Going back while it saves asks **Still saving** (**Stay** or **Leave**); if you leave, the save carries on. **Edit text** takes you back to the text instead. If you changed or removed rows, it first asks **Undo your changes to the rows?** (**Keep reviewing** or **Undo changes**).
-
-Good to know:
-
-- **The draft is not lost.** It is saved on the phone as you type and when you leave the screen, lock the phone or switch company, and it comes back, in the step you left, the next time you open **Brain dump**. Only a successful save replaces it: with nothing, or with the lines of the rows you removed with **×**, which come back in the text next time (delete them there once you no longer need them). If you opened **Brain dump** again and changed the draft while a save was still running, your newer draft is kept. It is kept per person and stays after sign-out. It sits unencrypted on the phone; **Debug Menu** → **Storage** lists it only as **(hidden: Brain dump draft)**.
-- **Save needs a connection.** Offline, **Save** is disabled with **Offline — Brain dump needs a connection to save. Your draft is kept.** It also waits while the app is **Checking which of these are already threads…**: the list is fetched fresh each time you open **Brain dump**. If that check fails, tap **Retry**.
-- **Up to 50 threads per save, all or nothing.** With more, Save is disabled with, for example, **One save takes up to 50 threads and this has 53. Remove 3 to save; removed rows stay in your draft for the next save.** Remove rows with **×** and save; the removed ones are back in the text the next time you open **Brain dump**. If a save fails, nothing is saved, the error is shown and the draft stays.
-- **It counts as your close-out.** Saving writes close-out check-ins, so the **No close-out since …** line on Start goes away. Because of those check-ins, saved threads can be parked but not deleted, so fix dictation slips before you save.
-- **New threads have no rank.** Rank them on **⋮** → **Rank threads** to bring them into the Top 3.
 
 ### Limits
 
@@ -552,14 +724,14 @@ Good to know:
 |------|-------|
 | Thread label | 120 characters. Unique, ignoring capitals, parked threads included. |
 | Next action, What happened, Waiting on | 2000 characters each |
-| Threads in one close-out | 1 to 50, saved all together or not at all |
+| Threads in one close-out or one Brain dump save | 1 to 50, saved all together or not at all |
 | Number of threads | No limit. Keep about a dozen active. |
 | Top 3 | 3 threads |
 | Waiting on you | 5 rows |
 | Project levels | 2 for new projects (main project and sub-project). One existing Tattva Silicon branch has 3. |
 | Project names | Not checked for duplicates |
-| Task name | 3 to 150 characters |
-| Bulk import | None for threads, projects or tasks. The only CSV import is for users. |
+| Task name | 3 to 150 characters in the web form. The mobile form checks only that it is not empty. |
+| Bulk entry | Threads: up to 50 per save, with Brain dump on the phone, the close-out's **+ new**, or the console snippet below. Projects and tasks: none, one form at a time. The only CSV import is for users. |
 
 ### What a thread needs to reach the Top 3
 
@@ -567,11 +739,15 @@ Good to know:
 2. It has a next action that is not blank.
 3. It has a rank.
 
-The rules in [How the Top 3 Is Chosen](#how-the-top-3-is-chosen) then pick three: rank 1 first, then stale threads, then the rest by rank. Threads you just created in a close-out are touched today, so right after the dump the Top 3 is simply ranks 1 to 3. A thread from **Add thread** or from your machine's activity has neither a next action nor a rank, so it stays in **Other threads** until a close-out and a ranking give it both.
+The rules in [How the Top 3 Is Chosen](#how-the-top-3-is-chosen) then pick three: rank 1 first, then stale threads, then the rest by rank. Threads you just created in a close-out or a Brain dump are touched today, so right after the dump the Top 3 is simply ranks 1 to 3. A thread from **Add thread** or from your machine's activity has neither a next action nor a rank, so it stays in **Other threads** until a close-out and a ranking give it both. A Brain dump line with no next action makes a thread that is touched but has no next action, so it also waits for one.
 
 ### Pasting a prepared list
 
-If the list is already typed somewhere, you can send it in one go. On the Start web page, open the browser console, define the `gql` helper from [Calling the API](#calling-the-api), and run one close-out with every entry:
+If the list is already typed somewhere, you can send it in one go.
+
+**On the phone:** copy the list, open **⋮** → **Brain dump** and paste it into the box. Each line becomes a row to check in Review (see [Brain Dump](#brain-dump)).
+
+**On the web:** on the Start page, open the browser console, define the `gql` helper from [Calling the API](#calling-the-api), and run one close-out with every entry:
 
 ```js
 await gql('mutation($e:[FounderCloseoutEntryInput!]!){ createFounderCloseout(entries:$e){ id label } }', { e: [
@@ -580,7 +756,7 @@ await gql('mutation($e:[FounderCloseoutEntryInput!]!){ createFounderCloseout(ent
 ] })
 ```
 
-It works exactly like the close-out: up to 50 entries, all or nothing, and new labels become threads. Each entry takes `label`, `nextAction`, `waitingOn` and `note`. It cannot take a project ID, so a project link comes only from an exact name match. Click **Refresh** afterwards.
+It works exactly like the close-out: up to 50 entries, all or nothing, and new labels become threads. Each entry names its thread by `label` (or by `resumePointId`, the thread's ID) and can carry `nextAction`, `waitingOn` and `note`. It cannot take a project ID, so a project link comes only from an exact name match. Click **Refresh** afterwards.
 
 ---
 
@@ -593,9 +769,9 @@ It works exactly like the close-out: up to 50 entries, all or nothing, and new l
 - With no Top 3: **No Top 3 yet — rank your threads and set next actions.**
 - If you have no active threads at all, no push is sent.
 
-Tap the push to open Start. If you are no longer a founder, it opens Notifications instead. On 1.1.9 and older the push opens Notifications even for a founder, because those versions have no Start.
+Tap the push to open Start. If the phone does not know you as a founder, it opens Notifications instead. An app older than 1.2.0 has no Start, so there the push always opens Notifications (see [If you are on an older version](#if-you-are-on-an-older-version)).
 
-After the push goes out, you also get an in-app notification with the same title, **Start · Wed 16 Sep**, and the text **Your Start for Wed 16 Sep is ready.**, linking to `/start`. It never contains thread names or next actions. No email is sent. In the mobile Notifications list (1.3.0), tapping that row marks it read and opens Start. If the phone does not yet know you are a founder (for example right after a fresh install), it only marks the row read.
+After the push goes out, you also get an in-app notification with the same title, **Start · Wed 16 Sep**, and the text **Your Start for Wed 16 Sep is ready.**, linking to `/start`. It never contains thread names or next actions. No email is sent. In the mobile Notifications list, tapping that row marks it read and opens Start. If the phone does not yet know you are a founder (for example right after a fresh install), it only marks the row read.
 
 ### When it comes
 
@@ -617,7 +793,7 @@ A pause stops the push for everyone who gets it, up to and including the chosen 
 3. The page shows **Paused until \<date>**.
 4. To resume early, click **Clear pause**. The page shows **Start push resumed**.
 
-Errors on the web: **Pick a date to pause until.** and **Pick today or a later date.** On both: **Could not update the Start pause.** (or the server's message). On mobile the date picker only lets you pick today or later, and you need a connection to change the pause (**You are offline — connect to change the pause.**).
+On the web, **Save** stays disabled until you pick a date, and a typed past date gives **Pick today or a later date.** On both: **Could not update the Start pause.** (or the server's message). On both, **Clear pause** shows only while a pause is active. On mobile the date picker only lets you pick today or later, and you need a connection to change the pause (**You are offline — connect to change the pause.**).
 
 The "push is on" text only looks at the pause. It still says the push is on when an admin has turned the push off (see [For Admins](#for-admins)).
 
@@ -630,8 +806,9 @@ Work through these in order:
 3. **Paused?** Look for the grey **Paused until …** line on Start.
 4. **Any active threads?** With no active (not parked) thread, nothing is sent.
 5. **Already sent today?** Only one push goes out per day. Check the in-app Notifications for **Your Start for \<today> is ready.** If it is there, Expo (the push service) accepted the push for your account. Your phone can still have missed it, for example because its device registration expired.
-6. **Phone set up for pushes?** The push counts as failed only when your account has no active push token or the request to Expo fails. A device that Expo rejects is only logged, and if Expo says the device is no longer registered, its token is marked invalid. To fix it: open the app on that phone while signed in (it registers the phone again at start), allow notifications for Karmayog in Android settings, or sign out and in again. The push goes to every phone and emulator where you are signed in.
-7. **Still nothing?** Ask an admin to check the server log and the cron result (see [The daily push job](#the-daily-push-job)).
+6. **Phone set up for pushes?** The push counts as failed only when your account has no active push token or the request to Expo fails. A device that Expo rejects is only logged, and if Expo says the device is no longer registered, its token is marked invalid. The server does not ask Expo afterwards whether each phone really got the push, so "accepted" is not the same as "delivered". To fix it: open the app on that phone while signed in (it registers the phone again at start), allow notifications for Karmayog in Android settings, or sign out and in again. The push goes to every phone and emulator where you are signed in.
+7. **Some phones get it and others do not?** That can be a problem with the push credentials, not with Start. Ask an admin to follow `docs/PUSH_NOTIFICATIONS_SETUP.md` (see [The daily push job](#the-daily-push-job)).
+8. **Still nothing?** Ask an admin to check the server log and the cron result (see [The daily push job](#the-daily-push-job)).
 
 Start itself does not depend on the push. Open it any time.
 
@@ -747,7 +924,7 @@ Claude (the assistant) reads and writes the same Start threads and check-ins thr
 
 The app has no switch for Claude's brief, because it runs separately from Karmayog. Once the 09:00 app push has been reaching your phone reliably each morning (the **Your Start for \<date> is ready.** row in Notifications only shows that Expo accepted the push, not that your phone got it):
 
-1. Turn off the schedule that runs Claude's morning brief, so you do not get two Starts each morning. It is not in this repo, and the Claude Code scheduled-tasks list on the founder's machine is empty. Ask Claude, where you set up the brief: "show my scheduled tasks and turn off the morning Start brief".
+1. Turn off the schedule that runs Claude's morning brief, so you do not get two Starts each morning. It is not in this repo, and on 17 Sep 2026 the Claude Code scheduled-tasks list on the founder's machine was empty (not re-checked since). Ask Claude, where you set up the brief: "show my scheduled tasks and turn off the morning Start brief".
 2. You can still ask Claude for a brief or a close-out whenever you like.
 
 Without a brief from Claude, the **Claude's notes** panel stays hidden on those days. The rest of Start is unchanged.
@@ -772,19 +949,34 @@ No. Only the rank is removed. Unpark it and rank it again.
 Only if it has no check-ins. Park it instead (see [Parking and unparking](#parking-and-unparking)).
 
 **Why did a thread I never created appear?**  
-A close-out **+ new** or your machine's activity used a label that matched no thread, active or parked. Check the spelling in `founder-map.json`, and update the map after renaming a thread.
+A close-out **+ new**, a Brain dump row or your machine's activity used a label that matched no thread, active or parked. Check the spelling in `founder-map.json`, and update the map after renaming a thread.
 
 **Can another person use Start?**  
 Only founders: platform admins and the employee IDs in `FOUNDER_EMPLOYEE_IDS`. All founders share the same threads and the same push settings. A **Company admin** is not a founder. The member list on the Company page tags platform admins with **platform admin**, and each of them is a founder. Those whose user status is active also get the 09:00 push.
 
 **Does switching company change Start?**  
-No. Threads, **Waiting on you** and team activity cover every company, and founder status does not depend on the company. On mobile a switch reloads the app and lands you on Start.
+No. Threads, **Waiting on you** and team activity cover every company, and founder status does not depend on the company. On mobile a switch reloads the app and lands you on Start. What does change with the company is outside Start: the web **Tasks** and **Development** lists and the mobile **Development** list, for everyone, and, unless you are a platform admin, the people lists and **Projects**. The mobile **Tasks**, **Your Work** and Home lists do not change: they show your own tasks from every company.
+
+**Why are Swarg or Tattva Silicon tasks missing from my Tasks list?**  
+The web **Tasks** and **Development** lists show only the company you are working in, for everyone, platform admins included. Switch company to see them. On Start, **Waiting on you** still shows yours from every company, and so do the phone's **Tasks**, **Your Work** and Home for your own tasks. See [What you see in each company](#what-you-see-in-each-company).
 
 **Do I have to set a PIN?**  
-No. In 1.3.0 the security PIN is optional. Without one the app never locks. See [Security PIN](#security-pin).
+No. The security PIN is optional. Without one the app never locks. Setting one needs a build that has the fix merged on 2026-10-06. See [Security PIN](#security-pin).
+
+**Why did the app sign me out?**  
+Your session ran out (sessions last 7 days) and the server refused a request. The app then signs you out by itself. No message explains it, though a save that was refused can flash a red **UNAUTHENTICATED: You must be signed in.** toast first. Sign in again with OTP. Your security PIN and your Brain dump draft are kept.
+
+**How do I know which version I have?**  
+Drawer → **Account**: the last line, under **Logout**, reads **Version** and the number, for example **Version 1.4.0**. No build number is shown anywhere. See [If you are on an older version](#if-you-are-on-an-older-version).
+
+**Is Brain dump on the web?**  
+No. It is on the phone only. On the web, use the close-out's **+ new**, which also takes up to 50 threads in one save.
+
+**Can Brain dump set "waiting on", rank a thread or make a task?**  
+No. It makes and updates threads with a label and a next action. Use the close-out for **Waiting on**, **Rank threads** for ranks, and **Create Task** for tasks. See [What Brain dump does not do](#what-brain-dump-does-not-do).
 
 **Is there an import for tasks or projects?**  
-No. Threads can be entered 50 at a time in one close-out. Projects and tasks are entered one form at a time. See [Getting Everything Out of Your Head](#getting-everything-out-of-your-head).
+No. Threads can be entered up to 50 at a time: on the phone with Brain dump, or on the web in one close-out. Projects and tasks are entered one form at a time. See [Getting Everything Out of Your Head](#getting-everything-out-of-your-head).
 
 ---
 
@@ -797,23 +989,37 @@ No. Threads can be entered 50 at a time in one close-out. Projects and tasks are
 | **No close-out since … — next actions may be stale.** | No close-out yesterday or today | Do a close-out |
 | **Showing the Start for … — today’s hasn’t loaded yet.** | Today's Start has not loaded yet | Pull down (mobile) or click **Refresh** (web) |
 | **Couldn’t refresh — showing the last loaded Start.** | Network or server error | Check your connection and refresh |
-| **Offline — close-out needs a connection** | Phone offline | Reconnect, then **Save**. Your text stays while the sheet is open. |
+| **Offline — close-out needs a connection** | Phone offline | Reconnect within about half a minute, then **Save**. If the phone stays offline longer, the **System Maintenance** screen takes over and the typed close-out is lost. |
+| The phone shows only **System Maintenance** | Two server checks in a row failed: the phone has had no connection for 30 to 60 seconds, or the server is down | Reconnect and tap **Retry Connection**, or wait for the next check. The app reloads and you land on Start (see [Offline on mobile](#offline-on-mobile)). |
 | Close-out sheet will not close | You typed something (also in a chip you have since unselected) | Tap **Cancel** to discard, or **Save** |
 | **A thread with this label already exists.** | Same label, maybe with different capitals | Use the existing thread or pick another label |
 | **A thread with this label already exists.** but no such thread on Start | The thread is parked | **Show parked** → **Unpark** |
-| Close-out saved (or Claude Code or commit activity recorded) but the thread never appears | The label belongs to a parked thread | **Show parked** → **Unpark**, or change the label in `founder-map.json` |
+| Close-out or Brain dump saved (or Claude Code or commit activity recorded) but the thread never appears | The label belongs to a parked thread. Brain dump says so on the row (**Parked — …**) and in its success message (**, N still parked**). | **Show parked** → **Unpark**, or change the label in `founder-map.json` |
 | Deleting a thread fails with **Rows in founder_checkins are immutable (append-only audit table)** | The thread has check-ins | Park it instead |
 | **That project is already linked to another thread.** | One project can have only one thread | Unlink the other thread first (ask Claude) |
 | **Project not found.** | The project does not exist or was deleted | Check the project ID |
 | **Ranking includes an unknown or parked thread.** | A thread in your list was parked or removed | Close and reopen **Rank threads**, then save again |
 | **Provide between 1 and 50 entries.** | Close-out with no threads or more than 50 | Select 1 to 50 threads |
-| **\<field> must be at most \<N> characters.** | Text too long (label 120; next action, note and waiting on 2000; activity summary 500; project ID 64). The text boxes on the web and in mobile 1.3.0 stop at these limits, and the machine scripts shorten labels and summaries themselves, so in practice this comes only from direct API calls, such as the console snippets in [Pasting a prepared list](#pasting-a-prepared-list) and [Calling the API](#calling-the-api). | Shorten it |
+| **\<field> must be at most \<N> characters.** | Text too long (label 120; next action, note and waiting on 2000; activity summary 500; project ID 64). The close-out and **Add thread** boxes on the web and on mobile stop at these limits, Brain dump flags a row that is over them and will not save it, and the machine scripts shorten labels and summaries themselves, so in practice this comes only from direct API calls, such as the console snippets in [Pasting a prepared list](#pasting-a-prepared-list) and [Calling the API](#calling-the-api). | Shorten it |
 | No **Start** in the drawer or **Work** menu, `/start` sends you to the dashboard, or **FORBIDDEN: You do not have permission to perform this action.** | An app older than 1.2.0, the wrong account, not a founder, or an expired session | Work through [Start is missing](#start-is-missing) |
-| **UNAUTHENTICATED: You must be signed in.**, or Start keeps failing to load on mobile | Your session expired (sessions last 7 days), or for scripts, a wrong token | On Start (and Feed, Notifications and Attendance), mobile 1.3.0 does not sign you out by itself. Opening **Home** or **Account** with an expired session does sign you out. Otherwise open the drawer, tap **Logout** and sign in again with OTP. On the web, sign in again. For scripts, check the token in `founder.env`. |
-| **Discard your new order?** right after **Ranks saved** (mobile) | A bug in 1.3.0: the ranks were saved, but the screen still counts them as changed | Tap **Discard**. Nothing is lost. |
+| The phone suddenly shows the sign-in screen | Your session expired (sessions last 7 days). The app signs you out by itself. No message explains it; a save that was refused can flash a red **UNAUTHENTICATED: You must be signed in.** toast first. | Sign in again with OTP. Your security PIN and Brain dump draft are kept; a close-out you were typing and unsaved rank changes are not. |
+| **UNAUTHENTICATED: You must be signed in.** | The server found no valid session. In a browser console call: your web session expired. For scripts: a wrong or missing token. On the phone you see it only as a brief red toast when a save was refused, just before the sign-in screen appears. | On the web, sign in again. For scripts, check the token in `founder.env`. On the phone, sign in again with OTP. If the phone shows it on Start and you stay signed in, check the app version (see [If you are on an older version](#if-you-are-on-an-older-version)), then tap **Logout** and sign in again. |
+| The phone does something this manual does not describe: no **Brain dump** in **⋮**, **Discard your new order?** right after **Ranks saved**, **Failed to create project** for a project that was created, made-up project names in **Create Task**, or Start failing to load instead of signing you out | The app is older than 1.4.0 | Check the **Version** line (drawer → **Account**), then see [If you are on an older version](#if-you-are-on-an-older-version) |
+| Nothing happens after **Save** on **Confirm New PIN**, and the app never locks | Your build does not have the PIN fix merged on 2026-10-06 | Install a 1.4.0 build made from code that includes the fix merged on 2026-10-06 (see [If you are on an older version](#if-you-are-on-an-older-version)) |
+| **Could not save the PIN. Please try again.** | The phone could not store the new PIN | Tap **Save** again |
 | Forgot the security PIN | — | On the lock screen tap **Forgot PIN? Sign out** → **Sign out**, then sign in with OTP (see [Security PIN](#security-pin)) |
-| The app stopped asking for your PIN after the update | 1.3.0 deletes the PIN from older versions | Set a new one (see [Security PIN](#security-pin)) |
-| The 1.3.0 APK will not install over the Play Store copy (adb reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`) | The APK is signed with the Android debug key, the installed copy with the Play Store key | Uninstall Karmayog first (see [Start is missing](#start-is-missing), step 1) |
+| The app stopped asking for your PIN after an update from 1.2.0 | A PIN set in 1.2.0 is deleted the first time a newer version starts | Set a new one. That needs a build that can store a PIN (see [Security PIN](#security-pin)). |
+| A test APK will not install over the Play Store copy (adb reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`) | The test APK is signed with the Android debug key, the installed copy with the Play Store key | Uninstall Karmayog first (see [Start is missing](#start-is-missing), step 1) |
+| **Draft not saved on this phone — save before you leave** or **Drafts can’t be kept on this phone — save before you leave** (Brain dump) | The phone could not store the draft, or has nowhere to keep one | Do not leave the screen: tap **Review (N)** and **Save (N)** now, or copy the text somewhere else first |
+| **Couldn’t load your threads to check for matches.** (Brain dump) | The thread list could not be fetched, so the app cannot tell new threads from existing ones | Check your connection and tap **Retry**. Your text is kept. |
+| **Fix row 4 to save.** (Brain dump) | That row has a red flag: no label, text over the limit, or the same label as another row with a different next action | Edit the row, or remove it with **×** |
+| **Nothing to save — every row is an existing thread with no new next action.** (Brain dump) | Every row matches a thread you already have and gives it nothing new | Type a new next action on a row, or tap **Edit text** and add new thoughts |
+| **Could not save the brain dump** | The save failed. Nothing was saved. | Check your connection and tap **Save (N)** again. The draft still holds everything. |
+| **Unpark** is greyed out (mobile) | The phone is offline | Reconnect |
+| No **+** button on mobile **Projects** | Your global role is not admin, top_management or management | Create the project on the web |
+| **You do not have permission to create projects in this company.** | You are not a platform admin, and not an admin of the company you are working in | Switch to the right company, or ask a platform admin |
+| **No projects to choose from. Tasks can only be filed in projects you have been added to.** (mobile **Create Task**) | You have not been added to any project that the list can show. Unless you are a platform admin, it shows only projects of the company you are working in. | Add yourself to the project, or switch company (see [Getting Everything Out of Your Head](#getting-everything-out-of-your-head)) |
+| A task you just created is not in the web **Tasks** list | Its project belongs to another company, and the list shows only the company you are working in | Switch company (see [What you see in each company](#what-you-see-in-each-company)) |
 | The phone shows only **Update Required**, and **Update App** finds nothing newer | An admin set **Minimum Android Version** higher than the Play Store version | Ask an admin to lower it on **App Version Management** (`/settings/app-management`) |
 | No 09:00 push | Push turned off (`enabled: false`), paused, no active threads, already sent, or no push registration | See [If the push did not arrive](#if-the-push-did-not-arrive) |
 | Claude Code work does not touch the thread | Repo not in the map, 20-minute wait, or setup problem (for example no `founder.env`) | Run the hook test with `FOUNDER_INGEST_DEBUG=1`. Look for "no founder-map entry for …", "debounced: …", "map not found: …", "config not found: …" or "jq is not installed". |
@@ -830,10 +1036,10 @@ No. Threads can be entered 50 at a time in one close-out. Projects and tasks are
 Work through these in order and stop at the first one that explains it.
 
 1. **Check the app version.** Open the drawer and tap **Account**. The last line, under **Logout**, reads **Version …**.
-   - **Version 1.2.0** or **Version 1.3.0**: go to step 2. (1.2.0 has Start but lacks the changes in [What's New in 1.3.0](#whats-new-in-130).)
-   - **1.1.9**, or anything below **1.2.0**: this app has no Start. There is no drawer item, and the 09:00 push opens **Notifications**. A Play Store release can carry an old build: the Play release in early October 2026 was 1.1.9, built from code older than 1.2.0. Install 1.3.0 (build 21).
-   - The 1.3.0 APK is signed with the Android debug key, not the Play Store key, so it will not install over the Play Store copy. Uninstall Karmayog first (from Android settings, or `adb uninstall com.karmayog`), then install the APK and sign in again with OTP. Uninstalling deletes the app's data on that phone (security PIN, fingerprint setting, saved project filter and the stored founder flag, so Start appears only once the first founder check succeeds; see step 4), but nothing on the server. This APK cannot be uploaded to the Play Store, and while it is installed a Play Store update cannot install over it either. Going back to the Play Store copy means uninstalling again. The lasting fix is a Play Store release of 1.3.0 or later, signed with the app's own key.
-   - Ignore the **Version** row in the drawer's **Debug Menu**. It shows the Android API level.
+   - **Version 1.2.0** or later (**1.3.0**, **1.4.0**): this app has Start. Go to step 2. If it is lower than **1.4.0**, some things work differently from this manual: see [If you are on an older version](#if-you-are-on-an-older-version).
+   - **1.1.9**, or anything below **1.2.0**: this app has no Start. There is no drawer item, and the 09:00 push opens **Notifications**. A Play Store release can carry an old build: the Play release in early October 2026 was 1.1.9, built from code older than 1.2.0. This manual cannot know what the Play Store has now, so check the Play listing. Install 1.4.0 (build 22) or a later build.
+   - A test APK handed to you directly is a release build signed with the Android debug key, not the Play Store key, so it will not install over the Play Store copy. Uninstall Karmayog first (from Android settings, or `adb uninstall com.karmayog`), then install the APK and sign in again with OTP. Uninstalling deletes the app's data on that phone (security PIN, fingerprint setting, saved project filter, any unsaved Brain dump draft and the stored founder answer, so Start appears only once the first founder check succeeds; see step 4), but nothing on the server. Save or copy a Brain dump draft before you uninstall. Such an APK cannot be uploaded to the Play Store, and while it is installed a Play Store update cannot install over it either. Going back to the Play Store copy means uninstalling again. The lasting fix is a Play Store release of 1.4.0 or later, signed with the app's own key.
+   - Ignore the **Version** row in **Debug Menu** → **Info**. It shows the Android API level.
 2. **Check the account.** Open the drawer. The line under your name and role is your employee ID, and it must read **AM-0001**. If not, tap **Logout** and sign in as AM-0001.
 3. **Ask the server.** On a computer, open https://task.amtariksha.com/start while signed in as AM-0001.
 
@@ -846,7 +1052,24 @@ Work through these in order and stop at the first one that explains it.
    | An error in red with **Retry**, and no **START · …** heading | The founder check failed, for example no network. The red text is the error itself, not a fixed message. | Click **Retry**. If it keeps failing, ask an admin to check the Vercel logs. |
    | The **START · …** heading and toolbar, with an error in red and **Retry** below (for example **Could not load Start.**) | You are a founder, but Start's data did not load | Click **Retry** |
 
-4. **Let the phone check again.** The phone asks the server whether you are a founder at sign-in and each time you come back to the app. In 1.3.0, if that check fails (no connection, a server error, or the phone cannot save the answer), the app quietly keeps its stored answer. On a fresh install, or after a **Logout**, that answer is "not a founder", so Start stays hidden. In 1.3.0 a network or server failure is not recorded anywhere, and nothing reaches **Debug Menu** → **Logs**. A failed save shows only in the Android system log (`adb logcat`: `Failed to save data for key founder_flag`). Mobile 1.4.0 writes every failure to **Debug Menu** → **Logs**. With a working connection, switch to another app and back. If **Start** still does not appear, tap **Logout** in the drawer and sign in again.
+   You can also ask the server directly. On that page, open the browser console, define the `gql` helper from [Calling the API](#calling-the-api) and run `await gql('{ me { employeeId isFounder } }')`. `isFounder: true` means the server counts you as a founder. `me: null` means this browser is not signed in.
+
+4. **Let the phone check again.** The phone asks the server whether you are a founder at sign-in, each time the app restarts, each time you come back to the app and after a company switch. When it gets no usable answer, it keeps the answer it has stored. On a fresh install, or after a **Logout**, the stored answer is "not a founder", so Start stays hidden until a check succeeds.
+
+   With a working connection, switch to another app and back. Then open the drawer and tap **Debug Menu** → **Logs**. Entries are listed newest first, each with its level, category, time and message. Look for the category **Founder**:
+
+   | Log message | What it means | What to do |
+   |-------------|---------------|------------|
+   | `ME_IS_FOUNDER returned an error; using the cached founder flag` | The request failed: no connection, the server could not be reached, or the server answered with an error. The entry shows the error text underneath. | Check the connection, then switch away and back again. If the text is a server error and it keeps failing, ask an admin to check the Vercel logs. |
+   | `ME_IS_FOUNDER request failed; using the cached founder flag` | The request was cancelled before any answer came back, for example because a sign-out or a company switch was running. This is rare. | Switch away and back again |
+   | `ME_IS_FOUNDER returned me = null; using the cached founder flag` | The server did not recognise your session. It has probably expired. | The next real request signs you out. If it does not, tap **Logout**. Sign in again with OTP. |
+   | `Could not cache the founder flag; using the server answer anyway` | The server answered, but the phone could not store the answer. The server's answer is used for now. After a restart the app may open on Home first, until a later check is stored. | Nothing to do if Start is showing |
+   | `Could not read the cached founder flag` | The phone could not read its stored answer and treats it as "not a founder" until a check succeeds | Switch away and back again with a working connection |
+   | No **Founder** entry after you switched away and back, and still no **Start** | The server answered, and the answer was "not a founder" for this account | Go back to steps 2 and 3 |
+
+   The log lives only in the running app and holds the last 500 entries. Closing or restarting the app empties it, so read it, or tap **Export**, before you close the app. The stored answer itself is listed under **Debug Menu** → **Storage** as `founder_flag`.
+
+   If **Start** still does not appear, tap **Logout** in the drawer and sign in again.
 
 ---
 
@@ -860,7 +1083,12 @@ Set these on the web server (Vercel). Never commit their values. Vercel applies 
 |----------|---------|
 | `FOUNDER_EMPLOYEE_IDS` | Comma-separated employee IDs that count as founders, on top of all platform admins. When empty, it defaults to `AM-0001`. Setting it **replaces** that default (AM-0001 still qualifies if it is a platform admin). |
 | `FOUNDER_INGEST_TOKEN` | Shared secret for `ingestFounderActivity` (the Stop hook and the nightly scan). Generate it with `openssl rand -hex 32` and put the same value in `founder.env` on the founder's machine. When unset, every ingest call is rejected. |
-| `CRON_SECRET` | Required for `/api/cron/*`. Vercel sends it as `Authorization: Bearer <CRON_SECRET>`. `apps/web/src/proxy.ts` checks it before the route runs: a missing or wrong header gets HTTP 401 `{"success":false,"error":"Invalid cron credentials"}`, and if the variable is not set at all, 401 `Cron secret is not configured`. |
+| `CRON_SECRET` | Required for the 09:00 push and every other `/api/cron/*` job. Vercel sends it as `Authorization: Bearer <CRON_SECRET>`. `apps/web/src/proxy.ts` checks it before the route runs: a missing or wrong header gets HTTP 401 `{"success":false,"error":"Invalid cron credentials"}`, and if the variable is not set at all, 401 `Cron secret is not configured`. |
+| `EXPO_ACCESS_TOKEN` | Optional. When it is set, every push request to Expo carries `Authorization: Bearer <token>`. When it is unset or blank, no such header is sent. It becomes required only if "Enhanced Security for Push Notifications" is switched on in the Expo account: pushes without it then fail with `UNAUTHORIZED`. So set the variable and redeploy before switching that on, and deploy a new value before revoking an old token. The steps are in `DEPLOYMENT_GUIDE.md`, section "Push Notifications (Expo / FCM)". |
+
+The founder code reads no other variable. Like the rest of the web app, it also needs `JWT_SECRET` (sessions; at least 16 characters; read only on the server) and `DATABASE_URL`.
+
+The repo cannot show what production has. To see which code is live, check Vercel → Deployments for the commit. To see which variables are set, check Settings → Environment Variables.
 
 ### Adding a founder
 
@@ -868,8 +1096,15 @@ Set these on the web server (Vercel). Never commit their values. Vercel applies 
 2. Redeploy the web app.
 3. Check that the new founder's user status is active, or they will not get the 09:00 push.
 4. The new founder reloads the web page or brings the mobile app back to the foreground (it checks again then). If Start still does not appear, they sign out and in again.
+5. To confirm, the new founder runs `await gql('{ me { employeeId isFounder } }')` in the browser console (see [Calling the API](#calling-the-api)). `isFounder` must be `true`.
 
 All founders share the same threads and the same pause.
+
+Three things to know:
+
+- **Removing a founder.** Someone whose platform-admin flag was removed can still see **Work** → **Start** on the web until they sign in again, because the menu uses the flag stored at sign-in. The page itself asks the server and sends them to the dashboard.
+- **A founder who is not a platform admin** (listed only in `FOUNDER_EMPLOYEE_IDS`) sees every company's rows in **Waiting on you**, like any founder. But opening a task or bug follows the company rules, so a row from a company they are not working in does not open (see [What you see in each company](#what-you-see-in-each-company)). On 2026-10-05 the only configured founder, AM-0001, was a platform admin.
+- **A newly made platform admin** gets Start at once, because the founder check reads the database. To cross the company boundary for tasks and bugs they must sign in again, or switch company if they belong to more than one: that rule uses the flag stored in the session, which is set at sign-in and, while it is still off, read again from the database on a company switch.
 
 ### Database
 
@@ -882,8 +1117,11 @@ All founders share the same threads and the same pause.
 
 - Cron: `/api/cron/founder-start` with schedule `30 3 * * *` (03:30 UTC = 09:00 IST) in `vercel.json`. Vercel can run it at any point from 03:00 to 03:59 UTC (08:30–09:29 IST); the server accepts a call from 08:00 IST. The time is set by that cron and must match `CRON_PUSH_HOUR_IST` / `CRON_PUSH_MINUTE_IST` in `push-schedule.ts`. Change both together, or a cron earlier than 08:00 IST is skipped as `too-early` (and the API keeps refusing any time other than the one in `push-schedule.ts`).
 - Skip reasons, in the order they are checked: `disabled`, `paused`, `already-sent`, `too-early` (before 08:00 IST). Then `no-founders`, `nothing-to-send` (no founder has an active thread), `already-sent` again (the atomic claim of the day lost to a concurrent or retried call) and `send-failed`. On `send-failed` the day is released so a later call the same day can retry. The day is released only when no founder's push went out; if at least one succeeded, founders whose push failed are not retried. The only automatic call is the once-a-day cron, so a retry needs a manual call (below).
-- Response: `{ success: true, status: 'sent'|'skipped', reason?, date, sent, failed }`, or HTTP 500 `{ success: false, error: 'Founder Start push failed' }`.
-- A founder with no active push token, or a failed request to Expo, logs `push not delivered to <id> (no active push token or Expo rejected it)`. A rejection for a single device logs `[sendPushNotification] Error for token …` and still counts as sent. The in-app notification row and the `start` check-in are written whenever Expo accepted the request.
+- Response: `{ success: true, status: 'sent'|'skipped', reason?, date, sent, failed }`, or HTTP 500 `{ success: false, error: 'Founder Start push failed' }`. The 500 case logs `Founder Start push failed:` with the error, without the `[founder-start]` prefix.
+- A founder with no active push token, or a failed request to Expo, logs `[founder-start] push not delivered to <id> (no active push token or Expo rejected it)`. A rejection for a single device logs `[sendPushNotification] Error for token ExponentPushToken[abcdef…] (DeviceNotRegistered): …` and still counts as sent. The in-app notification row and the `start` check-in are written whenever Expo accepted the request.
+- Logs never show a full device push token: at most the first 6 characters inside the brackets, as in `ExponentPushToken[abcdef…]`. The code in round brackets is Expo's error code for that device.
+- Only `DeviceNotRegistered` switches a device's token off. Any other rejection, such as a credentials error, leaves the token active, so the server keeps sending to it. The server never reads Expo's push receipts, so a failure that Expo reports only later is not logged at all.
+- When a push reaches some phones and not others, follow `docs/PUSH_NOTIFICATIONS_SETUP.md` and the "Push Notifications (Expo / FCM)" section of `DEPLOYMENT_GUIDE.md`. They explain how to check the Android (FCM V1) credentials for `com.karmayog` in the Expo project and how to match a failing token by its 6-character prefix. The guide records a test on 2026-09-17: Expo rejected 2 of AM-0001's 5 active Android tokens with `Unable to retrieve the FCM server key for the recipient's app`, a credentials problem that code cannot fix. The repo does not say whether that has been fixed since.
 - To turn the push off completely (not just pause it), call `updateFounderStartSettings(enabled: false)`. The app has no button for this and shows no sign of it. `pausedUntil` must be `YYYY-MM-DD`. The server checks only that format, not that the date is today or later (a past date is accepted and has no effect).
 
 **Running the job by hand.** This sends a real push and claims the day. With `CRON_SECRET` set in your shell to the server's value:
@@ -892,7 +1130,7 @@ All founders share the same threads and the same pause.
 curl -s -H "Authorization: Bearer $CRON_SECRET" https://task.amtariksha.com/api/cron/founder-start
 ```
 
-It is a GET request. Before 08:00 IST it returns reason `too-early`, and after a send the same day it returns `already-sent`. A wrong or missing secret returns HTTP 401 `{"success":false,"error":"Invalid cron credentials"}`. Logs: Vercel → project → Logs, search for `[founder-start]` or `sendPushNotification`.
+It is a GET request. Before 08:00 IST it returns reason `too-early`, and after a send the same day it returns `already-sent`. A wrong or missing secret returns HTTP 401 `{"success":false,"error":"Invalid cron credentials"}`. Logs: Vercel → project → Logs, search for `[founder-start]`, `sendPushNotification` or `Founder Start push failed`.
 
 ### GraphQL API (`/api/graphql`, founders only)
 
@@ -900,6 +1138,8 @@ Queries: `founderStart`, `founderResumePoints(includeParked)`, `founderCheckins(
 Mutations: `createFounderResumePoint(label, projectId)`, `updateFounderResumePoint(id, label, projectId, nextAction, waitingOn, isActive)`, `createFounderCloseout(entries)`, `updateFounderRanks(orderedIds)`, `updateFounderStartSettings(enabled, hour, minute, pausedUntil)`, `ingestFounderActivity(token, entries)` (checks the token instead of a login).
 
 Setting `nextAction` through `updateFounderResumePoint` also marks the thread as touched (`manual`). Changing only the label, project, waiting-on or active flag does not. Setting `projectId` to empty unlinks the project.
+
+A close-out entry names its thread by `resumePointId` or by `label`, and can carry `nextAction`, `waitingOn` and `note`. The mobile close-out, the web close-out and Brain dump all save through `createFounderCloseout`. The general query `me { employeeId isFounder }` tells any signed-in user whether the server counts them as a founder; `isFounder` is only ever true for the person asking.
 
 ### Calling the API
 
@@ -915,6 +1155,17 @@ const gql = (query, variables) => fetch('/api/graphql', { method: 'POST', header
 - Clear a next action (this also marks the thread touched): `await gql('mutation($id:ID!,$n:String){ updateFounderResumePoint(id:$id, nextAction:$n){ id nextAction } }', { id: '12', n: '' })`
 - Full history of a thread (the limit is capped at 100): `await gql('{ founderCheckins(resumePointId: 12, limit: 100) { kind note nextAction source createdAt } }')`
 - Push settings: `await gql('{ founderStartSettings { enabled pausedUntil lastSentDate } }')`
+- Am I a founder: `await gql('{ me { employeeId isFounder } }')`
+
+### Server changes merged on 2026-10-05
+
+These are on the server and apply to every app version. None of them changes Start.
+
+- **Lists and single items follow the company.** The GraphQL task, bug, project and user lists are limited to the company in the same way as the REST routes. Single task, bug and user lookups now need a session, and a task or bug follows the REST rule. See [What you see in each company](#what-you-see-in-each-company).
+- **Changing or deleting a task through GraphQL.** `updateTask` and `deleteTask` now apply the same rule as the REST routes: inside the company boundary, the task's owner or an assignee, a manager or team leader on the task's project, someone above an assignee in the reporting chain, or an admin of the task's company. Anyone else gets **FORBIDDEN: You do not have permission to modify this task.** No web or mobile screen uses these two mutations (both apps change and delete tasks through REST, which already had the rule), so nothing changes on screen.
+- **`JWT_SECRET` is server-only.** It is no longer in the `env` block of `next.config.js`, the token helpers are gone from the client-side `lib/auth.ts`, and `lib/auth-server.ts` is marked server-only, so importing it from client code fails the build. The server refuses to sign or check sessions unless `JWT_SECRET` is set and at least 16 characters long.
+- **No database credentials in the repo.** Maintenance scripts no longer carry a connection string. They need `DATABASE_URL` (the MySQL migration helpers also `MYSQL_PASSWORD`) from the environment, and the docs show placeholders. A test in `npm test` (in `apps/web`) and the GitHub workflow "Credential guard" fail when a database credential is committed. The founder machine scripts are not affected: they never touch the database. The production database password was rotated on 2026-10-05, after it was found committed in the public repo (confirmed by the founder; the repo cannot show it).
+- **Push.** Device push tokens are masked in the logs, `EXPO_ACCESS_TOKEN` is supported and `docs/PUSH_NOTIFICATIONS_SETUP.md` was added. See [The daily push job](#the-daily-push-job).
 
 ### Where the code lives
 
@@ -922,18 +1173,44 @@ const gql = (query, variables) => fetch('/api/graphql', { method: 'POST', header
 |------|------|
 | API | `apps/web/src/graphql/founder-schema.ts`, `founder-resolvers.ts` |
 | Rules, push, access | `apps/web/src/lib/founder/`: `compute-start.ts` (Top 3, stale), `start-format.ts`, `client-format.ts` (web display helpers), `push-schedule.ts`, `start-push.ts`, `start-service.ts`, `founder-auth.ts` |
+| Push sending | `apps/web/src/lib/push-notification-service.ts`, `apps/web/src/lib/expo-push.ts` (request headers with `EXPO_ACCESS_TOKEN`, token masking). Setup guide: `docs/PUSH_NOTIFICATIONS_SETUP.md`. |
 | Data | `apps/web/src/lib/db/founder*.ts` |
 | Cron | `apps/web/src/app/api/cron/founder-start/route.ts`, `vercel.json`, `apps/web/src/proxy.ts` (checks `CRON_SECRET` for every `/api/cron/*` call; it was `middleware.ts` before Next 16.3) |
-| Web UI | `apps/web/src/app/start/`, `apps/web/src/components/founder/`, `apps/web/src/hooks/useFounderStart.ts`, `apps/web/src/components/layout/Navbar.tsx` |
-| Mobile UI | `apps/mobile/src/screens/founder/`, `apps/mobile/src/components/founder/`, `apps/mobile/src/hooks/useFounderStart.ts`, `utils/founderFormat.ts` (copy of the date/age/label formatting), `App.tsx`, `components/CustomDrawerContent.tsx`, `services/founderFlagService.ts`, `utils/notificationRouting.ts` (push and Notifications-row routing to Start, from 1.3.0) |
+| Web UI | `apps/web/src/app/start/`, `apps/web/src/components/founder/`, `apps/web/src/hooks/useFounderStart.ts`, `apps/web/src/lib/founder-queries.ts` (GraphQL operations), `apps/web/src/components/layout/Navbar.tsx` |
+| Mobile UI | `apps/mobile/src/App.tsx` (routes, founder check, lock, new-day rule), `apps/mobile/src/screens/founder/` (`FounderStartScreen.tsx`, `FounderRankScreen.tsx`, `FounderBrainDumpScreen.tsx`), `apps/mobile/src/components/founder/` (cards, close-out sheet, dialogs, `FounderBrainDump*.tsx`, `useBrainDumpDraft.ts`), `apps/mobile/src/hooks/useFounderStart.ts`, `apps/mobile/src/config/founder-queries.ts` (GraphQL operations), `apps/mobile/src/components/CustomDrawerContent.tsx` |
+| Mobile rules | Under `apps/mobile/src/utils/`: `brainDump.ts` (Brain dump parsing, flags, save rules), `founderFormat.ts` (copy of the date/age/label formatting), `notificationRouting.ts` (push and Notifications-row routing to Start), `founderFlagRefresh.ts` (founder check), `authErrors.ts` and `sessionExpiry.ts` (expired-session sign-out), `pinStorageKey.ts` (security PIN key). Outside that folder: `apps/mobile/src/services/founderFlagService.ts` (founder check) and `apps/mobile/src/config/apollo.ts` (expired-session sign-out). |
+| Company rules | `apps/web/src/lib/tenancy/list-scope.ts` (lists), `apps/web/src/lib/tenancy/item-access.ts` (single items, requirements), `apps/web/src/lib/tasks/task-access.ts` (changing tasks), `apps/web/src/lib/authz.ts` |
 | Machine scripts | `scripts/founder/` (setup guide: `scripts/founder/README.md`) |
-| Tests | `apps/web/src/lib/founder/__tests__/` (run `npm test` in `apps/web`; it now runs every `src/lib/**/__tests__` test, the founder tests included) |
+| Tests | Web: `apps/web/src/lib/founder/__tests__/` and `apps/web/src/lib/__tests__/` (run `npm test` in `apps/web`; it runs every `src/lib/**/__tests__` test: founder rules, push helpers, company rules and the committed-credential scan). Mobile: `apps/mobile/src/utils/__tests__/` (run `npm test` in `apps/mobile`: Brain dump, founder check, session expiry, PIN key, notification routing, formatting). |
 
 The Start rules in `compute-start.ts` are also implemented separately in Claude's daily brief. Change them in both places or not at all. The formatting in `start-format.ts` is mirrored in `apps/mobile/src/utils/founderFormat.ts`; change both.
 
 ### Companies, Roles, Secrets and Approvals
 
-These arrived in the same release as mobile 1.3.0. None of them changes Start.
+These are the company, role, secrets and approval screens around Start. None of them changes Start. The company split dates from 2026-09-29, and the company rules for lists and single items were merged on 2026-10-05.
+
+#### What you see in each company
+
+You always work in one company at a time (the web navbar switcher, or drawer → **Account** → **Company** on mobile). What you see outside Start depends on it:
+
+| What | Who sees what |
+|------|---------------|
+| Web **Work** → **Tasks** and **Work** → **Development** (the bugs list), and the web **Your Work** and **Team Tasks** pages | Only tasks and bugs of the company you are working in, plus old items that have no company. This holds for everyone, platform admins and founders included. Switch company to see another company's. |
+| **Projects** (web **Admin** → **Projects**, mobile **Projects**) | A platform admin sees every company's projects without switching. Everyone else sees only the company they are working in: all its projects if they administer it, otherwise only the projects they are assigned to. This is about the lists: a web project page opened from a direct link is not checked against the company (see below). |
+| **Project \*** in **Create Task** | Only main projects you are assigned to, for every role. Unless you are a platform admin, also only those of the company you are working in. |
+| Opening one task or bug (a link, a list row, a notification) | The item must belong to the company you are working in, or have no company, or you must be a platform admin. Then you also need one of: the global role admin or top_management; being its assignee, assigner or supporter (for a bug: its reporter or assignee); or being a member of its project. Being a platform admin only crosses the company boundary. It grants nothing else. |
+| A project's requirements and secrets | Platform admins in any company. Everyone else only while working in the project's company. See [Project roles](#project-roles) and [Project secrets](#project-secrets). |
+| People lists | Members of the company you are working in. Platform admins see everyone. |
+| Mobile **Development** list | Only the company you are working in |
+| Mobile **Tasks**, **Your Work** and Home | Your own tasks from every company. Opening one from another company still follows the rule for one task above. |
+| Start | No company at all. Threads, **Waiting on you** and team activity cover every company. |
+
+What this means in practice:
+
+- Someone who is not a platform admin and is working in Amtariksha (COMP-001) cannot open Swarg (COMP-002) or Tattva Silicon (COMP-003) tasks, bugs, requirements or secrets, and does not see their projects, tasks or bugs in the web lists. A project assignment left over from before the split does not help there, because the company is checked before project membership. Being a global admin or top_management user does not help either.
+- Three things still get through for that person. A web project page opens from a direct link (for example `/projects/PRJ-037`) for any signed-in user, and shows the project's name, description, sub-projects and members. Someone still set as that project's **Manager** can edit it and its members. And on the phone, **Tasks**, **Your Work** and Home still list the person's own tasks from every company, though opening one is refused.
+- As a platform admin you see every company's projects, but the web **Tasks** and **Development** lists and the mobile **Development** list show only the company you are working in. From Amtariksha you see Swarg and Tattva Silicon tasks and bugs in **Waiting on you** on Start (when they are yours), in the mobile **Tasks**, **Your Work** and Home lists (your own tasks only), and by opening one directly.
+- A new task or bug takes the company of its project. A platform admin working in Amtariksha can file a task in a Swarg project, but the task list they return to does not show it. Switch to Swarg to see it.
 
 #### Company page (web)
 
@@ -955,7 +1232,9 @@ These arrived in the same release as mobile 1.3.0. None of them changes Start.
 
 COMP-001 Amtariksha kept everything except two project trees. COMP-002 Swarg (code SW) has PRJ-037 Swarg Food and its sub-projects PRJ-045, PRJ-046 and PRJ-047. COMP-003 Tattva Silicon (code TS) has PRJ-051 and the projects under it: PRJ-048, PRJ-049 (with its own sub-project PRJ-050) and PRJ-052. PRJ-002 "Swarg" (Amtariksha's software work for Swarg) and its sub-projects stayed in COMP-001. Their tasks, bugs and requirements moved with the projects.
 
-Nobody was moved: every membership is still in COMP-001. Someone who is not a platform admin sees a Swarg or Tattva Silicon project in the **Projects** list only after they are a member of that company and have switched to it. Start is not affected.
+The split moved nobody. On 2026-09-29 all 21 people were members of COMP-001 only, and the split did not touch memberships or project assignments. This manual cannot see who has been added since; step 1 below shows today's state.
+
+Until a Swarg or Tattva Silicon person has been added to that company and has switched to it, they do not see that company's tasks, bugs or projects in the web lists, and cannot open its tasks, bugs, requirements or secrets. A project page still opens from a direct link (see [What you see in each company](#what-you-see-in-each-company)). You must switch to Swarg or Tattva Silicon yourself to see their tasks and bugs in the web **Tasks** and **Development** lists, and the switcher lists only companies you are a member of. Start is not affected.
 
 To set it up:
 
@@ -969,7 +1248,7 @@ To set it up:
 4. **Admin** → **Company** now shows Swarg. Add each Swarg person as **Member**, or as **Company admin** for the person who will run it there. Add every Swarg person yourself: a company admin who is not a platform admin cannot add existing people from this page.
 5. Switch to Tattva Silicon (COMP-003) and repeat.
 6. Switch back to Amtariksha, so your next sign-in lands there.
-7. Tell each person you added to switch company: the web navbar switcher, or on mobile drawer → **Account** → tap the **Company** row → tap the company in the **Switch company** sheet.
+7. Tell each person you added to switch company: the web navbar switcher, or on mobile drawer → **Account** → tap the **Company** row → tap the company in the **Switch company** sheet. Until they switch, they see none of that company's tasks or bugs on the web. After they switch, that company is where their next sign-in lands, and they stop seeing Amtariksha's lists until they switch back.
 
 #### Project roles
 
@@ -983,14 +1262,20 @@ Each project member is a **Manager**, **Team leader** or **Member** of that proj
 
 A **Company admin** of the project's company, and every platform admin, can do what a manager can. Anyone in that company whose global role is admin or top_management counts as a company admin here.
 
-Requirements follow their own rule, whatever the project role: a project member can edit them when **Req. edit** is ticked on their row of the project page, or when their global role is management. Users whose global role is admin or top_management can edit them without being members. Being a company admin does not count.
+Requirements follow their own rule, whatever the project role:
 
-- **Web:** on the project page, each member row shows the project role, with the person's global role in grey beside it. The dropdown (**Member**, **Team leader**, **Manager**) appears for anyone with the Projects tab permission, global role admin or top_management, and platform admins. It saves at once with no confirmation. The server accepts the change only from the project's manager, a company admin or a platform admin; anyone else gets an alert saying **You do not manage this project.** A project manager without the Projects tab sees no dropdown on the web and has to use mobile.
-- **Mobile 1.3.0:** on Project details the role badge ends in " ›" when you can change it. Each tap moves it one step (member → team leader → manager → member) and saves at once, with no confirmation. One tap too many makes someone a manager, so check the badge when you are done.
+- **To see** a project's requirements you must be a platform admin, or be working in the project's company and be either a member of the project or a **Company admin** of that company (a member of it whose global role is admin or top_management counts). Anyone else gets **FORBIDDEN: You are not a member of this project.** That includes a global admin or top_management user of another company.
+- **To edit** them you must first pass that rule. Then you need either the global role admin, top_management or management, or **Req. edit** ticked on your row of the project page. Otherwise you get **FORBIDDEN: You don't have edit access to this project's requirements.**
+- So a **Company admin** with an ordinary global role can read a project's requirements without being a member, but cannot edit them: **Req. edit** exists only on a member's row.
+
+Where to set project roles:
+
+- **Web:** on the project page, under **Assigned Users**, each member row shows the project role, with the person's global role in grey beside it. The dropdown (**Member**, **Team leader**, **Manager**) appears for anyone with the Projects tab permission, global role admin or top_management, and platform admins. It saves at once with no confirmation. The server accepts the change only from the project's manager, a company admin or a platform admin; anyone else gets an alert saying **You do not manage this project.** A project manager without the Projects tab sees no dropdown on the web and has to use mobile.
+- **Mobile:** on **Project Details**, under **Assigned Team Members**, the role badge ends in " ›" when you can change it. Each tap moves it one step (member → team leader → manager → member) and saves at once, with no confirmation. One tap too many makes someone a manager, so check the badge when you are done.
 
 #### Project secrets
 
-- **Mobile 1.3.0:** Project details → **Secrets** → **Open vault** opens **Project Secrets**, a read-only list of credential names and environment keys (**Dev**, **Staging**, **Prod**). Every **Reveal** asks for your fingerprint or face (the phone's own PIN or pattern also works) and is recorded in the project's access log. One value shows at a time. It hides after 30 seconds, when the app goes to the background, or when you leave the screen. **Copy** clears the clipboard after 45 seconds, but only while you stay on the screen: leave sooner and the value stays on the clipboard. Screenshots are blocked on that screen. Without a fingerprint or face set up on the phone, nothing can be revealed.
+- **Mobile:** **Project Details** → **Secrets** → **Open vault** opens **Project Secrets**, a read-only list of credential names and environment keys (**Dev**, **Staging**, **Prod**). Every **Reveal** asks for your fingerprint or face (the phone's own PIN or pattern also works) and is recorded in the project's access log. One value shows at a time. It hides after 30 seconds, when the app goes to the background, or when you leave the screen. **Copy** clears the clipboard after 45 seconds, but only while you stay on the screen: leave sooner and the value stays on the clipboard. Screenshots are blocked on that screen. Without a fingerprint or face set up on the phone, nothing can be revealed.
 - **Web:** project page → **Credentials**. Adding, editing, uploading, **Export .env** and deleting stay on the web.
 - **Who:** platform admins, in any company. Everyone else only while working in the project's company: project members can view and reveal; a **Manager** or **Team leader** on the project and a **Company admin** of that company can also change, export and read the access log. Anyone in the company whose global role is admin or top_management counts as a company admin here. Otherwise the server refuses with **No access to this project**, even for a project member who has not switched to the project's company.
 - **Limit:** once you have 40 reveals or exports in the last 10 minutes (counted across all projects, web and mobile, credential reveals and **Export .env** included), the mobile vault refuses further environment-variable reveals with **Too many secrets revealed in the last 10 minutes. Try again shortly.** Credential reveals and web reveals are never blocked.
@@ -999,11 +1284,13 @@ Requirements follow their own rule, whatever the project role: a project member 
 
 #### Approvals
 
-Nobody can approve or reject their own leave, WFH or attendance request, founders and platform admins included. On the mobile **Approvals** screen, 1.3.0 shows **Your own request — waiting for your manager.** instead of the buttons. The mobile leave and WFH detail screens simply show no Approve or Reject. The web **Approvals** page still shows **Approve** on your own request. For your own leave or WFH request, **Approve** → **Approved** ends in **Server error: API request failed: 403 …**. For your own attendance request, **Approve** → OK shows **Failed to approve request: FORBIDDEN: You do not have permission to approve this request.** Someone else must approve yours: another platform admin, a **Company admin** of the company they are working in (if you belong to it), or someone above you in the reporting chain. Anyone in that company whose global role is admin or top_management counts as a company admin here.
+Nobody can approve or reject their own leave, WFH or attendance request, founders and platform admins included. The mobile **Approvals** screen shows **Your own request — waiting for your manager.** instead of the buttons. The mobile leave and WFH detail screens simply show no Approve or Reject. The web **Approvals** page still shows **Approve** on your own request. For your own leave or WFH request, **Approve** → **Approved** ends in **Server error: API request failed: 403 …**. For your own attendance request, **Approve** → OK shows **Failed to approve request: FORBIDDEN: You do not have permission to approve this request.** Someone else must approve yours: another platform admin, or someone working in a company you belong to who is either a **Company admin** of it or above you in the reporting chain. Anyone in that company whose global role is admin or top_management counts as a company admin here.
 
 #### Minimum app version
 
-On **App Version Management** (`/settings/app-management`), **Minimum Android Version** makes any older phone show only **Update Required**. Its **Update App** button opens the Play Store, which had 1.1.9 on 2026-10-05. Do not raise the minimum above the version on the Play Store. The debug-signed 1.3.0 APK cannot go to the Play Store; a Play release needs a build signed with the app's own key (see `apps/mobile/RELEASE_GUIDE.md`).
+On **App Version Management** (`/settings/app-management`), **Minimum Android Version** makes any older phone show only **Update Required**. Its **Update App** button opens the Play Store. Do not raise the minimum above the version on the Play Store. Check the Play listing first: it had 1.1.9 on 2026-10-05, and this manual cannot know what it has now.
+
+A test APK signed with the Android debug key cannot go to the Play Store. A Play release needs a build signed with the app's own key (see `apps/mobile/RELEASE_GUIDE.md`). A local release build stops with "Release build would be signed with the debug keystore. …" unless the signing settings `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`, `RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD` are provided. For a build that will never be distributed, pass `-PallowDebugSignedRelease=true`.
 
 ---
 
