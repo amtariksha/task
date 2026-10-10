@@ -17,6 +17,7 @@ import { DEFAULT_RELEASE_CHECKLIST } from '@/lib/releaseChecklistDefault'
 import { Plus, X, UserPlus, Users, Search, AlertTriangle } from 'lucide-react'
 import { hasTabAccess } from '@/lib/permissions'
 import { getCurrentUser } from '@/lib/auth'
+import { describeProjectLoadFailure } from '@/lib/projects/load-failure'
 
 const EMPTY_CHECKLIST: ReleaseChecklistTemplate = { sections: [] }
 
@@ -32,6 +33,8 @@ export default function ProjectDetailsPage() {
   const [project, setProject] = useState<ProjectWithSubProjects | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  // Why the server refused this project (it belongs to another company).
+  const [accessRefused, setAccessRefused] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string>('')
   const [employeeId, setEmployeeId] = useState<string>('')
   const [deleting, setDeleting] = useState(false)
@@ -88,13 +91,21 @@ export default function ProjectDetailsPage() {
     try {
       setLoading(true)
       setError(null)
+      setAccessRefused(null)
 
       const response = await fetch(`/api/projects/${projectId}`)
       if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Project not found')
+        const failure = describeProjectLoadFailure(
+          response.status,
+          await response.json().catch(() => null)
+        )
+        if (failure.kind === 'forbidden') {
+          // An answer, not a fault: drop anything already on screen and say why.
+          setProject(null)
+          setAccessRefused(failure.message)
+          return
         }
-        throw new Error('Failed to fetch project')
+        throw new Error(failure.message)
       }
 
       const data = await response.json()
@@ -403,6 +414,25 @@ export default function ProjectDetailsPage() {
           <div className="text-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
             <p className="mt-4 text-gray-600">Loading project...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (accessRefused) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-8">
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-6" role="alert">
+            <h3 className="text-lg font-medium text-amber-900 mb-2">You can&rsquo;t open this project</h3>
+            <p className="text-amber-800">{accessRefused}</p>
+            <button
+              onClick={handleBack}
+              className="mt-4 text-sm text-amber-700 hover:text-amber-900 font-medium"
+            >
+              ← Back to Projects
+            </button>
           </div>
         </div>
       </div>
