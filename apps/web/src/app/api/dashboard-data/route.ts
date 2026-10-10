@@ -169,7 +169,7 @@ export async function GET(request: NextRequest) {
     return res
   } catch (error: any) {
     console.error('Error in GET /api/dashboard-data:', error)
-    return NextResponse.json({ success: false, error: error?.message || 'Failed to load dashboard data' }, { status: 500 })
+    return NextResponse.json({ success: false, error: 'Failed to load dashboard data' }, { status: 500 })
   }
 }
 

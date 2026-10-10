@@ -31,10 +31,8 @@ export async function GET(
     })
   } catch (error) {
     console.error('Failed to get artifact counts:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch artifact counts'
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to fetch artifact counts' },
       { status: 500 }
     )
   }

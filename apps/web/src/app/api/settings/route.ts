@@ -8,6 +8,7 @@
  * - No ENUM restrictions
  */
 
+import { isApplicationError } from '@/lib/api/client-error'
 import { getAuthUser, requireAuth } from '@/lib/auth-server'
 import { canAdminCompany, isPlatformAdmin } from '@/lib/authz'
 import {
@@ -151,7 +152,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch settings'
+        error: 'Failed to fetch settings'
       },
       { status: 500 }
     )
@@ -261,15 +262,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Settings API POST error:', error)
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to create setting'
-    const statusCode = errorMessage.includes('already exists') ? 409 : 500
+    // The data layer turns a duplicate key into its own "… already exists" message.
+    const duplicate = isApplicationError(error) && error.message.includes('already exists') ? error.message : null
 
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage
+        error: duplicate ?? 'Failed to create setting'
       },
-      { status: statusCode }
+      { status: duplicate ? 409 : 500 }
     )
   }
 }

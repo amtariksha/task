@@ -75,8 +75,9 @@ export async function GET(request: NextRequest) {
       await pool.query('SELECT 1')
       poolStats.health.warnings.push('Database ping successful')
     } catch (error) {
+      console.error('Database ping failed:', error)
       poolStats.health.status = 'critical'
-      poolStats.health.warnings.push(`Database ping failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      poolStats.health.warnings.push('Database ping failed')
     }
     
     return NextResponse.json({
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
     console.error('Failed to get database status:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get database status',
+      error: 'Failed to get database status',
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }

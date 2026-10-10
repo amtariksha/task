@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error('Error in POST /api/users/batch:', error)
     return NextResponse.json(
-      { success: false, error: error?.message || 'Failed to fetch users batch' },
+      { success: false, error: 'Failed to fetch users batch' },
       { status: 500 }
     )
   }

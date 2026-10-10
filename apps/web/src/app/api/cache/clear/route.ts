@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
     console.error('Failed to clear cache:', error)
     return NextResponse.json({
       success: false,
-      error: error?.message || 'Failed to clear cache'
+      error: 'Failed to clear cache'
     }, { status: 500 })
   }
 }

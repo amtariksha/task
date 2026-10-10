@@ -241,7 +241,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ Due-checking cron failed:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal Server Error'
+      error: 'Internal Server Error'
     }, { status: 500 })
   }
 }

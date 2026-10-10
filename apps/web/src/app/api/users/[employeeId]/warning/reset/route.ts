@@ -35,7 +35,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Failed to reset warning count:', error)
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to reset warning count' },
+      { success: false, error: 'Failed to reset warning count' },
       { status: 500 }
     )
   }

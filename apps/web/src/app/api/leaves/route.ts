@@ -25,11 +25,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Failed to get leave applications:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get leave applications'
-
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: 'Failed to get leave applications'
     }, { status: 500 })
   }
 }
@@ -118,14 +116,10 @@ export async function POST(request: NextRequest) {
       message: 'Leave application created successfully'
     }, { status: 201 })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to create leave application:', {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    })
+    console.error('Failed to create leave application:', error)
     return NextResponse.json({
       success: false,
-      error: errorMessage || 'Failed to create leave application'
+      error: 'Failed to create leave application'
     }, { status: 500 })
   }
 }

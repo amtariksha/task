@@ -159,25 +159,18 @@ export async function POST(request: NextRequest) {
     } catch (updateError) {
       console.error('❌ [TIME-TRACKING-SYNC] Error updating entity:', updateError)
 
-      // Provide detailed error message
-      const errorMessage = updateError instanceof Error ? updateError.message : 'Unknown error'
-      const errorStack = updateError instanceof Error ? updateError.stack : undefined
-
+      // Log what was being synced; the error itself is logged above.
       console.error('❌ [TIME-TRACKING-SYNC] Error details:', {
         entityType,
         entityId,
         state,
-        totalTime,
-        errorMessage,
-        errorStack
+        totalTime
       })
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Failed to update timer data',
-          details: errorMessage,
-          stack: errorStack
+          error: 'Failed to update timer data'
         },
         { status: 500 }
       )
@@ -185,19 +178,10 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ [TIME-TRACKING-SYNC] Outer error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorStack = error instanceof Error ? error.stack : undefined
-
-    console.error('❌ [TIME-TRACKING-SYNC] Outer error details:', {
-      errorMessage,
-      errorStack
-    })
-
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage,
-        stack: errorStack
+        error: 'Failed to sync timer data'
       },
       { status: 500 }
     )

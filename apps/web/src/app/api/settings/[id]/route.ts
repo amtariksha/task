@@ -109,7 +109,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch setting'
+        error: 'Failed to fetch setting'
       },
       { status: 500 }
     )
@@ -191,12 +191,10 @@ export async function PATCH(
   } catch (error) {
     console.error('Setting API PATCH error:', error)
 
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update setting'
-
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage
+        error: 'Failed to update setting'
       },
       { status: 500 }
     )
@@ -258,7 +256,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete setting'
+        error: 'Failed to delete setting'
       },
       { status: 500 }
     )

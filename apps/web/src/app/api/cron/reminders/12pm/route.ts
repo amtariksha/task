@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ 12 PM Midday Review Cron Job failed:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal Server Error'
+      error: 'Internal Server Error'
     }, { status: 500 })
   }
 }

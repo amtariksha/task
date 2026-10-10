@@ -92,19 +92,10 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ [SUBTASKS-GET] SubTasks API GET error:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch subtasks'
-    const errorStack = error instanceof Error ? error.stack : undefined
-
-    console.error('❌ [SUBTASKS-GET] Error details:', {
-      errorMessage,
-      errorStack
-    })
-
     return NextResponse.json(
       {
         success: false,
-        error: errorMessage,
-        stack: errorStack
+        error: 'Failed to fetch subtasks'
       },
       { status: 500 }
     )
@@ -160,7 +151,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to create subtask'
+        error: 'Failed to create subtask'
       },
       { status: 500 }
     )

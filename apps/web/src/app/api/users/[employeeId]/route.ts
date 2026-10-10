@@ -34,11 +34,9 @@ export async function GET(
     })
   } catch (error) {
     console.error('Failed to get user from MySQL:', error)
-    const errorMessage = error instanceof Error ? error.message : 'User not found or MySQL unavailable'
-
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: 'User not found or unavailable'
     }, { status: 404 })
   }
 }
@@ -93,11 +91,9 @@ export async function PUT(
     })
   } catch (error) {
     console.error('Failed to update user in MySQL:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update user - MySQL unavailable'
-
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: 'Failed to update user'
     }, { status: 500 })
   }
 }

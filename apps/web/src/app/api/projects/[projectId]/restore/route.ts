@@ -7,6 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { describeFailure } from '@/lib/api/client-error'
 import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
 import { getProjectById, restoreProject } from '@/lib/db/projects'
@@ -76,18 +77,11 @@ export async function POST(
     )
   } catch (error) {
     console.error('Error restoring project:', error)
-    
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
 
-    return NextResponse.json(
-      { error: 'Failed to restore project' },
-      { status: 500 }
-    )
+    // What the database layer's validation threw goes out as a 400; a driver
+    // error is a 500 that says nothing about the schema.
+    const { status, message } = describeFailure(error, 'Failed to restore project', 400)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 

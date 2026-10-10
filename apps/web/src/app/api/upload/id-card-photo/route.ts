@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to generate upload URL'
+        error: 'Failed to generate upload URL'
       },
       { status: 500 }
     )
@@ -163,7 +163,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to update ID card photo'
+        error: 'Failed to update ID card photo'
       },
       { status: 500 }
     )

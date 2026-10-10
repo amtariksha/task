@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     console.error('Failed to update delayed tasks:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update delayed tasks'
+      error: 'Failed to update delayed tasks'
     }, { status: 500 })
   }
 }
@@ -46,7 +46,7 @@ export async function GET() {
     console.error('Failed to get delayed tasks summary:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to get delayed tasks summary'
+      error: 'Failed to get delayed tasks summary'
     }, { status: 500 })
   }
 }

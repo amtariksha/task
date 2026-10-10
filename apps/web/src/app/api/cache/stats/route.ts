@@ -23,7 +23,7 @@ export async function GET() {
     console.error('Failed to get cache stats:', error)
     return NextResponse.json({
       success: false,
-      error: error?.message || 'Failed to get cache stats'
+      error: 'Failed to get cache stats'
     }, { status: 500 })
   }
 }

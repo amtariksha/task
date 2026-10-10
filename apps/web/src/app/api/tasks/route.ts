@@ -72,18 +72,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('❌ [TASKS-GET] Failed to get tasks from MySQL:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get tasks - MySQL unavailable'
-    const errorStack = error instanceof Error ? error.stack : undefined
-
-    console.error('❌ [TASKS-GET] Error details:', {
-      errorMessage,
-      errorStack
-    })
-
     return NextResponse.json({
       success: false,
-      error: errorMessage,
-      stack: errorStack
+      error: 'Failed to get tasks'
     }, { status: 500 })
   }
 }
@@ -235,7 +226,7 @@ export async function POST(request: NextRequest) {
     console.error('Failed to add task to MySQL:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to add task - MySQL unavailable'
+      error: 'Failed to add task'
     }, { status: 500 })
   }
 }

@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Failed to list companies:', error)
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to list companies' },
+      { success: false, error: 'Failed to list companies' },
       { status: 500 }
     )
   }
@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
       )
     }
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to create company' },
+      { success: false, error: 'Failed to create company' },
       { status: 500 }
     )
   }

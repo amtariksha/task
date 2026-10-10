@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     console.error('Migration error:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to add settings'
+      error: 'Failed to add settings'
     }, { status: 500 })
   }
 }

@@ -25,11 +25,9 @@ export async function GET(request: NextRequest) {
     })
   } catch (error) {
     console.error('Failed to get WFH applications:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to get WFH applications'
-
     return NextResponse.json({
       success: false,
-      error: errorMessage
+      error: 'Failed to get WFH applications'
     }, { status: 500 })
   }
 }
@@ -123,14 +121,10 @@ export async function POST(request: NextRequest) {
       message: 'WFH application created successfully'
     }, { status: 201 })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    console.error('Failed to create WFH application:', {
-      error: errorMessage,
-      stack: error instanceof Error ? error.stack : undefined
-    })
+    console.error('Failed to create WFH application:', error)
     return NextResponse.json({
       success: false,
-      error: errorMessage || 'Failed to create WFH application'
+      error: 'Failed to create WFH application'
     }, { status: 500 })
   }
 }

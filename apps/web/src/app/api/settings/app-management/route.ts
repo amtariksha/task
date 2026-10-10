@@ -94,7 +94,7 @@ async function handleUpdate(request: NextRequest) {
     console.error('❌ Failed to update app version configuration:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update app version configuration'
+      error: 'Failed to update app version configuration'
     }, { status: 500 })
   }
 }

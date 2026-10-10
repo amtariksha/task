@@ -47,12 +47,10 @@ export async function GET(request: NextRequest) {
     return response
   } catch (error) {
     console.error('Failed to get users from database:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Database unavailable'
-
     const response = NextResponse.json({
       success: false,
       data: [],
-      error: errorMessage,
+      error: 'Failed to fetch users',
       timestamp: Date.now()
     }, { status: 500 })
 
@@ -86,10 +84,7 @@ function describeCreateUserError(error: unknown): { message: string; status: num
   }
   if (code === '23502') return { message: 'A required field was missing.', status: 400 }
 
-  return {
-    message: error instanceof Error ? error.message : 'Failed to create user',
-    status: 500,
-  }
+  return { message: 'Failed to create user', status: 500 }
 }
 
 export async function POST(request: NextRequest) {

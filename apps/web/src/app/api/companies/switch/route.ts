@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Failed to switch company:', error)
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'Failed to switch company' },
+      { success: false, error: 'Failed to switch company' },
       { status: 500 }
     )
   }

@@ -91,10 +91,8 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error fetching activity log:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to fetch activity log' },
       { status: 500 }
     )
   }
@@ -314,25 +312,16 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ [ACTIVITY-LOG] Error creating activity log:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const errorStack = error instanceof Error ? error.stack : undefined
-
-    // Log detailed error information
+    // Log what was being recorded; the error itself is logged above.
     console.error('❌ [ACTIVITY-LOG] Error details:', {
       entityType,
       entityId,
       actionType,
-      userId: request.cookies.get('token') ? 'authenticated' : 'no token',
-      errorMessage,
-      errorStack
+      userId: request.cookies.get('token') ? 'authenticated' : 'no token'
     })
 
     return NextResponse.json(
-      {
-        success: false,
-        error: errorMessage,
-        details: errorStack
-      },
+      { success: false, error: 'Failed to log activity' },
       { status: 500 }
     )
   }

@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ [BUG-SUBTASKS-GET] Error:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch bug subtasks'
+      error: 'Failed to fetch bug subtasks'
     }, { status: 500 })
   }
 }

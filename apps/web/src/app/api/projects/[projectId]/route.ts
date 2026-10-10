@@ -9,6 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { describeFailure } from '@/lib/api/client-error'
 import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
 import { requireProjectRead } from '@/lib/tenancy/project-guard'
@@ -151,19 +152,11 @@ export async function PUT(
     return NextResponse.json({ ...updatedProject, success: true }, { status: 200 })
   } catch (error) {
     console.error('Error updating project:', error)
-    
-    // Return specific error messages
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
 
-    return NextResponse.json(
-      { error: 'Failed to update project' },
-      { status: 500 }
-    )
+    // What the database layer's validation threw goes out as a 400; a driver
+    // error is a 500 that says nothing about the schema.
+    const { status, message } = describeFailure(error, 'Failed to update project', 400)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 
@@ -235,19 +228,11 @@ export async function DELETE(
     )
   } catch (error) {
     console.error('Error deleting project:', error)
-    
-    // Return specific error messages
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
 
-    return NextResponse.json(
-      { error: 'Failed to delete project' },
-      { status: 500 }
-    )
+    // What the database layer's validation threw goes out as a 400; a driver
+    // error is a 500 that says nothing about the schema.
+    const { status, message } = describeFailure(error, 'Failed to delete project', 400)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 

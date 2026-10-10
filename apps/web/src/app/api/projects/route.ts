@@ -8,6 +8,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { describeFailure } from '@/lib/api/client-error'
 import {
   getAllProjects,
   getActiveProjects,
@@ -112,7 +113,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const body = await request.json()
+    // An absent or malformed body is the caller's mistake: it falls through to
+    // the 400 below instead of throwing into the catch block as a 500.
+    const body = (await request.json().catch(() => null)) ?? {}
 
     if (!body.projectName) {
       return NextResponse.json(
@@ -156,19 +159,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(newProject, { status: 201 })
   } catch (error) {
     console.error('Error creating project:', error)
-    
-    // Return specific error messages
-    if (error instanceof Error) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: 400 }
-      )
-    }
 
-    return NextResponse.json(
-      { error: 'Failed to create project' },
-      { status: 500 }
-    )
+    // What the database layer's validation threw goes out as a 400; a driver
+    // error is a 500 that says nothing about the schema.
+    const { status, message } = describeFailure(error, 'Failed to create project', 400)
+    return NextResponse.json({ error: message }, { status })
   }
 }
 

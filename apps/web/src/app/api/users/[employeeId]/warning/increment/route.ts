@@ -28,7 +28,7 @@ export async function POST(
   } catch (error: any) {
     console.error('Failed to increment warning count:', error)
     return NextResponse.json(
-      { success: false, error: error.message || 'Failed to increment warning count' },
+      { success: false, error: 'Failed to increment warning count' },
       { status: 500 }
     )
   }

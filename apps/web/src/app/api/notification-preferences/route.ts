@@ -46,14 +46,9 @@ export async function GET(request: NextRequest) {
       data: preferences
     })
   } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
     const errorCode = (error as any)?.code
 
-    console.error('Error fetching notification preferences:', {
-      error: errorMessage,
-      code: errorCode,
-      stack: error instanceof Error ? error.stack : undefined
-    })
+    console.error('Error fetching notification preferences:', error)
 
     // Check if table doesn't exist
     if (errorCode === 'ER_NO_SUCH_TABLE') {
@@ -69,7 +64,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: errorMessage || 'Failed to fetch notification preferences' },
+      { success: false, error: 'Failed to fetch notification preferences' },
       { status: 500 }
     )
   }

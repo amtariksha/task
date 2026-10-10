@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         {
           errors: [{
-            message: executionError.message || 'Internal server error',
+            message: 'Internal server error',
             extensions: {
               code: 'INTERNAL_SERVER_ERROR'
             }
@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { errors: [{ message: error?.message || 'Internal server error' }] },
+      { errors: [{ message: 'Internal server error' }] },
       { status: 500 }
     )
   }

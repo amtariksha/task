@@ -52,10 +52,8 @@ export async function GET(
     })
   } catch (error) {
     console.error('Failed to get project users:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to fetch project users'
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to fetch project users' },
       { status: 500 }
     )
   }
@@ -122,10 +120,8 @@ export async function POST(
     })
   } catch (error) {
     console.error('Failed to assign user to project:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to assign user'
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to assign user' },
       { status: 500 }
     )
   }
@@ -211,10 +207,8 @@ export async function PATCH(
     })
   } catch (error) {
     console.error('Failed to update requirements-edit flag:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to update permission'
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to update permission' },
       { status: 500 }
     )
   }
@@ -262,10 +256,8 @@ export async function DELETE(
     })
   } catch (error) {
     console.error('Failed to remove user from project:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Failed to remove user'
-
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to remove user' },
       { status: 500 }
     )
   }

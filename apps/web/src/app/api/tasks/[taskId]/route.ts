@@ -70,7 +70,7 @@ export async function GET(
     console.error('Failed to fetch task from MySQL:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to fetch task - MySQL unavailable'
+      error: 'Failed to fetch task'
     }, { status: 500 })
   }
 }
@@ -337,7 +337,7 @@ export async function PUT(
     console.error('Failed to update task in MySQL:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update task - MySQL unavailable'
+      error: 'Failed to update task'
     }, { status: 500 })
   }
 }
@@ -401,7 +401,7 @@ export async function DELETE(
     console.error('Failed to delete task from MySQL:', error)
     return NextResponse.json({
       success: false,
-      error: 'Failed to delete task - MySQL unavailable'
+      error: 'Failed to delete task'
     }, { status: 500 })
   }
 }

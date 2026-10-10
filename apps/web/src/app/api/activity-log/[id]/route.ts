@@ -2,6 +2,7 @@
 // Handles DELETE (delete comment)
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isApplicationError } from '@/lib/api/client-error'
 import { deleteActivityLog, getActivityLogById } from '@/lib/db/activityLog'
 import { verifyToken } from '@/lib/auth-server'
 
@@ -66,8 +67,9 @@ export async function DELETE(
 
   } catch (error) {
     console.error('❌ Error deleting activity log:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
+    // Only the data layer's own refusals are matched by their wording.
+    const errorMessage = isApplicationError(error) ? error.message : ''
+
     // Handle specific error messages
     if (errorMessage.includes('not found')) {
       return NextResponse.json(
@@ -91,7 +93,7 @@ export async function DELETE(
     }
     
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to delete comment' },
       { status: 500 }
     )
   }
@@ -157,10 +159,8 @@ export async function GET(
 
   } catch (error) {
     console.error('❌ Error fetching activity log:', error)
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    
     return NextResponse.json(
-      { success: false, error: errorMessage },
+      { success: false, error: 'Failed to fetch activity log' },
       { status: 500 }
     )
   }

@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
     console.error('❌ 6 PM Evening Wrap-up Cron Job failed:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Internal Server Error'
+      error: 'Internal Server Error'
     }, { status: 500 })
   }
 }

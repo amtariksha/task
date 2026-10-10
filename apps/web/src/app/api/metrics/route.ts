@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
     console.error('Failed to get metrics:', error)
     return NextResponse.json({
       success: false,
-      error: error?.message || 'Failed to get metrics'
+      error: 'Failed to get metrics'
     }, { status: 500 })
   }
 }
@@ -45,7 +45,7 @@ export async function DELETE() {
     console.error('Failed to clear metrics:', error)
     return NextResponse.json({
       success: false,
-      error: error?.message || 'Failed to clear metrics'
+      error: 'Failed to clear metrics'
     }, { status: 500 })
   }
 }

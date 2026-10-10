@@ -101,7 +101,7 @@ export async function POST(
     } else {
       return NextResponse.json({
         success: false,
-        error: `Failed to send email: ${emailResult.message}`
+        error: 'Failed to send credentials email'
       }, { status: 500 })
     }
 

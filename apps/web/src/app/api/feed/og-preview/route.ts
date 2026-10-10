@@ -90,19 +90,17 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Error fetching OG preview:', error)
 
-    // Provide detailed error message
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-    const isTimeout = errorMessage.includes('timeout') || errorMessage.includes('aborted')
+    // AbortSignal.timeout rejects with a DOMException named TimeoutError.
+    const isTimeout = error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError')
 
     return NextResponse.json(
       {
         success: false,
         error: isTimeout
           ? 'Request timed out. The website took too long to respond.'
-          : 'Failed to fetch preview. Please check the URL and try again.',
-        details: errorMessage
+          : 'Failed to fetch preview. Please check the URL and try again.'
       },
-      { status: 200 } // Return 200 with error details for better client-side handling
+      { status: 200 } // Return 200 so the client reads the message from the body
     )
   }
 }

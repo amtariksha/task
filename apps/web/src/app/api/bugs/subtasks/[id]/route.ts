@@ -33,7 +33,7 @@ export async function PATCH(
     console.error('?O [BUG-SUBTASKS-PATCH] Error:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to update bug subtask'
+      error: 'Failed to update bug subtask'
     }, { status: 500 })
   }
 }
@@ -78,7 +78,7 @@ export async function DELETE(
     console.error('?O [BUG-SUBTASKS-DELETE] Error:', error)
     return NextResponse.json({
       success: false,
-      error: error instanceof Error ? error.message : 'Failed to delete bug subtask'
+      error: 'Failed to delete bug subtask'
     }, { status: 500 })
   }
 }

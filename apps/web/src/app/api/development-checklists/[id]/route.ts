@@ -49,7 +49,7 @@ export async function GET(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to fetch bug subtask'
+        error: 'Failed to fetch bug subtask'
       },
       { status: 500 }
     )
@@ -106,7 +106,7 @@ export async function PATCH(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to update bug subtask'
+        error: 'Failed to update bug subtask'
       },
       { status: 500 }
     )
@@ -182,7 +182,7 @@ export async function DELETE(
     return NextResponse.json(
       {
         success: false,
-        error: error instanceof Error ? error.message : 'Failed to delete bug subtask'
+        error: 'Failed to delete bug subtask'
       },
       { status: 500 }
     )
