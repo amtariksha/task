@@ -148,7 +148,7 @@ describe('lib/tenancy/project-guard wires the real lookups and returns the refus
 
   test('the lookups are the database ones, not stand-ins', () => {
     assert.match(guard, /import \{ getProjectCompanyId \} from '\.\.\/db\/projects'/)
-    assert.match(guard, /import \{ isPlatformAdmin \} from '\.\.\/authz'/)
+    assert.match(guard, /import \{ canAdminCompany, canManageProject, isPlatformAdmin \} from '\.\.\/authz'/)
     assert.match(guard, /const deps: ProjectReadDeps = \{\n  getProjectCompanyId,\n  isPlatformAdmin,\n\}/)
     assert.match(
       functionBody(guard, 'export async function projectReadAccess('),
