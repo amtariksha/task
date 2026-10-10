@@ -11,7 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
-import { requireProjectRead } from '@/lib/tenancy/project-guard'
+import { projectReparentAccess, requireProjectRead } from '@/lib/tenancy/project-guard'
+import { INVALID_PARENT_ID_MESSAGE, parentIdFromBody } from '@/lib/tenancy/project-parent'
 import { isInCompanyScope, projectListScope } from '@/lib/tenancy/list-scope'
 import { 
   getProjectById, 
@@ -98,7 +99,9 @@ export async function GET(
  * The actor is taken from the session; an `updatedBy` in the body is ignored.
  *
  * Permissions: canManageProject — a company admin of the project's company, or
- * the project's own manager.
+ * the project's own manager. Changing the parent also needs the right to manage
+ * the new parent, which must be in the project's own company
+ * (lib/tenancy/project-parent decideProjectReparent).
  */
 export async function PUT(
   request: NextRequest,
@@ -136,7 +139,28 @@ export async function PUT(
     // Prepare updates (only include fields that are provided)
     const updates: any = {}
     if (body.projectName !== undefined) updates.projectName = body.projectName
-    if (body.parentProjectId !== undefined) updates.parentProjectId = body.parentProjectId
+
+    // The parent was validated for the hierarchy only, so a project could be
+    // moved under another company's project — which that company could then not
+    // delete — and the hierarchy errors described its projects to an outsider.
+    if (body.parentProjectId !== undefined) {
+      const parent = parentIdFromBody(body.parentProjectId)
+      if (!parent.valid) {
+        return NextResponse.json(
+          { success: false, error: INVALID_PARENT_ID_MESSAGE },
+          { status: 400 }
+        )
+      }
+      const move = await projectReparentAccess(auth.user, existingProject, parent.parentId)
+      if (!move.allowed) {
+        return NextResponse.json(
+          { success: false, error: move.message },
+          { status: move.status }
+        )
+      }
+      updates.parentProjectId = parent.parentId
+    }
+
     if (body.description !== undefined) updates.description = body.description
     if (body.status !== undefined) updates.status = body.status
     if (body.releaseEnabled !== undefined) updates.releaseEnabled = body.releaseEnabled
