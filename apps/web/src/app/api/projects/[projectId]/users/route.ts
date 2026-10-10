@@ -20,6 +20,7 @@ import {
 } from '@/lib/db/project-users'
 import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
+import { requireProjectRead } from '@/lib/tenancy/project-guard'
 
 const VALID_PROJECT_ROLES: ProjectRole[] = ['manager', 'team_leader', 'member']
 
@@ -27,16 +28,22 @@ const VALID_PROJECT_ROLES: ProjectRole[] = ['manager', 'team_leader', 'member']
  * GET /api/projects/[projectId]/users
  *
  * Returns all users assigned to the project with their details
+ *
+ * Permissions: requireProjectRead — a session working in the project's company,
+ * or a platform admin.
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ projectId: string }> }
 ) {
   try {
-    const auth = await requireAuth(request)
+    const { projectId } = await params
+
+    // A session alone was enough here, so the members of any company's project —
+    // names, emails and roles — were readable by id.
+    const auth = await requireProjectRead(request, projectId)
     if (!auth.ok) return auth.response
 
-    const { projectId } = await params
     const users = await getProjectUsers(projectId)
 
     return NextResponse.json({

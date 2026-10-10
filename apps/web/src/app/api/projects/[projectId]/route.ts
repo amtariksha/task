@@ -11,6 +11,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-server'
 import { canManageProject } from '@/lib/authz'
+import { requireProjectRead } from '@/lib/tenancy/project-guard'
+import { isInCompanyScope, projectListScope } from '@/lib/tenancy/list-scope'
 import { 
   getProjectById, 
   updateProject, 
@@ -21,10 +23,15 @@ import {
 /**
  * GET /api/projects/[projectId]
  * 
- * Get a specific project by ID
+ * Get a specific project by ID, with its sub-projects
  * 
  * Query parameters:
- * - includeDeleted: 'true' | 'false' (default: 'false', admin only)
+ * - includeDeleted: 'true' | 'false' (default: 'false'). Honoured only for
+ *   someone who may manage the project; for anyone else a deleted project is
+ *   a 404, as it is without the parameter.
+ *
+ * Permissions: requireProjectRead — a session working in the project's company,
+ * or a platform admin. Project membership is not required.
  */
 export async function GET(
   request: NextRequest,
@@ -32,20 +39,32 @@ export async function GET(
 ) {
   try {
     const { projectId } = await params
-    const searchParams = request.nextUrl.searchParams
-    const includeDeleted = searchParams.get('includeDeleted') === 'true'
+
+    // This handler had no check at all, so any signed-in user could read another
+    // company's project — name, description, status and sub-projects — by id.
+    const auth = await requireProjectRead(request, projectId)
+    if (!auth.ok) return auth.response
+
+    // A soft-deleted project is for the people who can restore it. The parameter
+    // was documented as admin only and honoured for everyone.
+    const wantsDeleted = request.nextUrl.searchParams.get('includeDeleted') === 'true'
+    const includeDeleted = wantsDeleted && (await canManageProject(auth.user, projectId))
 
     const project = await getProjectById(projectId, includeDeleted)
 
     if (!project) {
       return NextResponse.json(
-        { error: 'Project not found' },
+        { success: false, error: 'Project not found' },
         { status: 404 }
       )
     }
 
-    // Also get sub-projects if this is a main project
-    const subProjects = await getSubProjects(projectId)
+    // Also get sub-projects if this is a main project. They share the parent's
+    // company; one that has since been moved to another is not listed here.
+    const scope = projectListScope(auth.user)
+    const subProjects = (await getSubProjects(projectId)).filter((subProject) =>
+      isInCompanyScope(scope, subProject.companyId)
+    )
 
     return NextResponse.json(
       { 
@@ -57,7 +76,7 @@ export async function GET(
   } catch (error) {
     console.error('Error fetching project:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch project' },
+      { success: false, error: 'Failed to fetch project' },
       { status: 500 }
     )
   }

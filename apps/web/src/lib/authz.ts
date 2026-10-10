@@ -30,7 +30,8 @@ import {
 } from './db/companies'
 import { getProjectRole, isUserAssignedToProject, type ProjectRole } from './db/project-users'
 import { isInManagerChain, getVisibleEmployeeIds } from './db/users'
-import { getProjectById } from './db/projects'
+import { getProjectById, getProjectCompanyId } from './db/projects'
+import { canManageProject as canManageProjectRule, type ProjectManageDeps } from './tenancy/item-access'
 
 export interface Actor {
   employeeId: string
@@ -102,8 +103,23 @@ export async function canManageUsers(actor: Actor, companyId: string): Promise<b
   return canAdminCompany(actor, companyId)
 }
 
+// Lookups for lib/tenancy/item-access.canManageProject.
+const projectManageDeps: ProjectManageDeps = {
+  getProjectCompanyId,
+  isPlatformAdmin,
+  canAdminCompany,
+  getProjectRole,
+}
+
 /**
- * May the actor create, edit or archive this project?
+ * May the actor create, edit or archive this project? A company admin of the
+ * project's company, or the project's own manager — and, unless they are a
+ * platform admin, only while working in that company.
+ *
+ * This used to stop at the role: a `manager` row left in project_users after
+ * the project moved to another company still passed, from a session working in
+ * the old one. The rule lives in lib/tenancy/item-access so it runs under
+ * `node --test`.
  *
  * Looks the project up INCLUDING soft-deleted rows: restoring a deleted project
  * is a management action, and with the default lookup the project came back null
@@ -111,22 +127,20 @@ export async function canManageUsers(actor: Actor, companyId: string): Promise<b
  * admins included.
  */
 export async function canManageProject(actor: Actor, projectId: string): Promise<boolean> {
-  const project = await getProjectById(projectId, true)
-  if (!project) return false
-
-  const companyId = (project as { companyId?: string }).companyId
-  if (companyId && (await canAdminCompany(actor, companyId))) return true
-
-  // A project manager runs their own project.
-  return (await getProjectRole(projectId, actor.employeeId)) === 'manager'
+  return canManageProjectRule(actor, projectId, projectManageDeps)
 }
 
-/** May the actor see this project at all? */
+/**
+ * May the actor see this project at all? Company first, then company admin or
+ * membership. Nothing calls this yet; the single-project routes use the looser
+ * lib/tenancy/project-guard.requireProjectRead.
+ */
 export async function canViewProject(actor: Actor, projectId: string): Promise<boolean> {
   const project = await getProjectById(projectId)
   if (!project) return false
 
   const companyId = (project as { companyId?: string }).companyId
+  if (!(await isSameCompany(actor, companyId))) return false
   if (companyId && (await canAdminCompany(actor, companyId))) return true
 
   return isUserAssignedToProject(projectId, actor.employeeId)

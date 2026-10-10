@@ -1,5 +1,6 @@
 /**
- * Who may read one task, one bug, or one project's requirements over GraphQL.
+ * Who may read one task, one bug, one project or its requirements, and who may
+ * manage a project.
  *
  * /api/graphql is exempt from the proxy auth gate (it carries the public `login`
  * mutation), and the `task` and `bug` resolvers ran their project-access gate only
@@ -16,14 +17,19 @@
  *   requirements  no REST route; authz.canViewProject with the same tenant
  *                 boundary in front, so a project's requirements are visible to
  *                 exactly the sessions that can see its tasks and bugs.
+ *   project       /api/projects/[projectId] and its member list: the tenant
+ *                 boundary alone to read (decideProjectRead), the boundary and
+ *                 then company admin or project manager to change
+ *                 (canManageProject, which authz.canManageProject delegates to).
  *
  * The tenant boundary fails open for a record with no company (legacy rows
  * migration 063 could not resolve) and for a token with no company (issued before
  * 062), exactly as authz.isSameCompany does. Platform admins cross it.
  *
  * Kept free of database imports: lookups are injected so the rules run under
- * `node --test` (see __tests__/item-access.test.mjs). graphql/resolvers.ts and
- * graphql/requirement-resolvers.ts wire in the real ones.
+ * `node --test` (see __tests__/item-access.test.mjs). graphql/resolvers.ts,
+ * graphql/requirement-resolvers.ts, authz.ts and ./project-guard.ts wire in the
+ * real ones.
  */
 
 export interface ItemActor {
@@ -213,4 +219,65 @@ export async function readBug(actor: ItemActor, bugId: string, deps: BugReadDeps
   if (!row) return { status: 'not_found' }
   if (!(await canViewBug(actor, bugAccessFacts(row), deps))) return { status: 'forbidden' }
   return { status: 'found', row }
+}
+
+export type ProjectAccessDecision =
+  | { allowed: true }
+  | { allowed: false; status: 403 | 404; message: string }
+
+export const PROJECT_NOT_FOUND_MESSAGE = 'Project not found'
+export const PROJECT_OTHER_COMPANY_MESSAGE =
+  'This project belongs to another company. Switch to that company to open it.'
+
+export type ProjectReadDeps = Pick<ProjectAccessDeps, 'getProjectCompanyId' | 'isPlatformAdmin'>
+
+export interface ProjectManageDeps extends Omit<ProjectAccessDeps, 'isProjectMember'> {
+  /** project_users.role, or null when the actor is not on the project. */
+  getProjectRole: (projectId: string, employeeId: string) => Promise<string | null>
+}
+
+/**
+ * GET /api/projects/[projectId], its member list and the GraphQL `projectUsers`
+ * query: the tenant boundary and nothing more.
+ *
+ * Membership is deliberately NOT required. A sub-project has no member rows of
+ * its own (the list routes show it to members of its parent), and the task and
+ * bug pages look up a project's name for an assignee or reporter who is not on
+ * the project. Inside the company the GraphQL `projects` list already returns
+ * every project to every member, so a membership test here would break those
+ * callers without hiding anything.
+ */
+export async function decideProjectRead(
+  actor: ItemActor,
+  projectId: string,
+  deps: ProjectReadDeps
+): Promise<ProjectAccessDecision> {
+  const projectCompanyId = await deps.getProjectCompanyId(projectId)
+  if (projectCompanyId === undefined) {
+    return { allowed: false, status: 404, message: PROJECT_NOT_FOUND_MESSAGE }
+  }
+  if (!(await isSameCompany(actor, projectCompanyId, deps))) {
+    return { allowed: false, status: 403, message: PROJECT_OTHER_COMPANY_MESSAGE }
+  }
+  return { allowed: true }
+}
+
+/**
+ * authz.canManageProject delegates here: a company admin of the project's
+ * company, or the project's own manager — behind the tenant boundary.
+ *
+ * Without the boundary a `manager` row in project_users outlived the project's
+ * move to another company, and kept the right to edit, delete and restore it and
+ * to add and remove its members from a session working somewhere else.
+ */
+export async function canManageProject(
+  actor: ItemActor,
+  projectId: string,
+  deps: ProjectManageDeps
+): Promise<boolean> {
+  const projectCompanyId = await deps.getProjectCompanyId(projectId)
+  if (projectCompanyId === undefined) return false
+  if (!(await isSameCompany(actor, projectCompanyId, deps))) return false
+  if (projectCompanyId && (await deps.canAdminCompany(actor, projectCompanyId))) return true
+  return (await deps.getProjectRole(projectId, actor.employeeId)) === 'manager'
 }

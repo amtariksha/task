@@ -130,6 +130,19 @@ export async function getProjectById(project_id: string, includeDeleted = false)
 }
 
 /**
+ * The company a project belongs to, for the tenant-boundary checks.
+ *
+ * `undefined` means there is no such project. Soft-deleted projects resolve, so
+ * archiving one does not turn "another company's project" into "not found".
+ * `null` is a row with no company (none since migration 062 made it NOT NULL).
+ */
+export async function getProjectCompanyId(project_id: string): Promise<string | null | undefined> {
+  const project = await getProjectById(project_id, true)
+  if (!project) return undefined
+  return project.companyId ?? null
+}
+
+/**
  * Get sub-projects of a parent project
  * @param parentProjectId - The parent project ID
  */

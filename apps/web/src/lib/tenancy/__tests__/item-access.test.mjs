@@ -2,10 +2,14 @@
 import { test, describe } from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  PROJECT_NOT_FOUND_MESSAGE,
+  PROJECT_OTHER_COMPANY_MESSAGE,
   bugAccessFacts,
+  canManageProject,
   canViewBug,
   canViewProjectRequirements,
   canViewTask,
+  decideProjectRead,
   isSameCompany,
   readBug,
   readTask,
@@ -34,6 +38,13 @@ const PROJECT_MEMBERS = {
   'PRJ-037': ['AM-0002', 'SF-0001'],
   'PRJ-050': [],
   'PRJ-LEGACY': ['AM-0002'],
+}
+
+// project_users.role. AM-0002 was PRJ-037's manager before the project moved to COMP-002, and the row was never removed.
+const PROJECT_ROLES = {
+  'PRJ-001': { 'AM-0002': 'team_leader' },
+  'PRJ-037': { 'AM-0002': 'manager', 'SF-0001': 'manager' },
+  'PRJ-LEGACY': { 'AM-0002': 'manager' },
 }
 
 // Company roles as user_companies holds them; AM-0001 is a legacy global admin, not a company_admin.
@@ -79,6 +90,10 @@ function fakeDeps() {
     getProjectCompanyId: async (projectId) => {
       record('getProjectCompanyId', projectId)
       return projectId in PROJECT_COMPANY ? PROJECT_COMPANY[projectId] : undefined
+    },
+    getProjectRole: async (projectId, employeeId) => {
+      record('getProjectRole', projectId, employeeId)
+      return PROJECT_ROLES[projectId]?.[employeeId] ?? null
     },
     // authz.canAdminCompany
     canAdminCompany: async (actor, companyId) => {
@@ -367,5 +382,124 @@ describe('canViewProjectRequirements — authz.canViewProject behind the tenant 
 
   test('an unknown project is refused', async () => {
     assert.equal(await canView(platformAdmin, 'PRJ-NOPE'), false)
+  })
+})
+
+describe('decideProjectRead — GET /api/projects/[projectId] and its member list', () => {
+  const read = (actor, projectId, deps = fakeDeps()) => decideProjectRead(actor, projectId, deps)
+  const otherCompany = { allowed: false, status: 403, message: PROJECT_OTHER_COMPANY_MESSAGE }
+
+  test('anyone working in the project\'s company may read it, member or not', async () => {
+    const comp001NonMember = { employeeId: 'AM-0007', role: 'employee', companyId: 'COMP-001', isPlatformAdmin: false }
+    assert.deepEqual(await read(comp001Member, 'PRJ-001'), { allowed: true })
+    assert.deepEqual(await read(comp001NonMember, 'PRJ-001'), { allowed: true })
+    assert.deepEqual(await read(comp002Member, 'PRJ-037'), { allowed: true })
+  })
+
+  test('another company\'s project is refused by id, whatever the role or membership', async () => {
+    // AM-0002 still holds a PRJ-037 membership; AM-0001 holds the global admin role.
+    assert.deepEqual(await read(comp001Member, 'PRJ-037'), otherCompany)
+    assert.deepEqual(await read(companyAdmin, 'PRJ-037'), otherCompany)
+    assert.deepEqual(await read(comp002Member, 'PRJ-001'), otherCompany)
+    assert.deepEqual(await read(comp002Member, 'PRJ-050'), otherCompany)
+  })
+
+  test('it is the tenant boundary and nothing more: no membership or role lookup', async () => {
+    const deps = fakeDeps()
+    await read(comp001Member, 'PRJ-001', deps)
+    await read(comp001Member, 'PRJ-037', deps)
+    assert.deepEqual(deps.calls, [
+      ['getProjectCompanyId', 'PRJ-001'],
+      ['getProjectCompanyId', 'PRJ-037'],
+      ['isPlatformAdmin', 'AM-0002'],
+    ])
+  })
+
+  test('a platform admin reads every company\'s project', async () => {
+    for (const projectId of ['PRJ-001', 'PRJ-037', 'PRJ-050', 'PRJ-LEGACY']) {
+      assert.deepEqual(await read(platformAdmin, projectId), { allowed: true }, projectId)
+      assert.deepEqual(await read(platformAdminInComp002, projectId), { allowed: true }, projectId)
+    }
+  })
+
+  test('fails open for a project with no company and a token with no company', async () => {
+    assert.deepEqual(await read(comp002Member, 'PRJ-LEGACY'), { allowed: true })
+    assert.deepEqual(await read(pre062Token, 'PRJ-037'), { allowed: true })
+  })
+
+  test('an unknown project is a 404, decided before any other lookup', async () => {
+    const deps = fakeDeps()
+    assert.deepEqual(await read(comp001Member, 'PRJ-NOPE', deps), {
+      allowed: false,
+      status: 404,
+      message: PROJECT_NOT_FOUND_MESSAGE,
+    })
+    assert.deepEqual(deps.calls, [['getProjectCompanyId', 'PRJ-NOPE']])
+  })
+
+  test('the refusal says why, in words a user can act on', () => {
+    assert.match(PROJECT_OTHER_COMPANY_MESSAGE, /another company/)
+    assert.match(PROJECT_OTHER_COMPANY_MESSAGE, /[Ss]witch/)
+  })
+})
+
+describe('canManageProject — authz.canManageProject, behind the tenant boundary', () => {
+  const canManage = (actor, projectId, deps = fakeDeps()) => canManageProject(actor, projectId, deps)
+  const swargAdmin = { employeeId: 'SF-0002', role: 'employee', companyId: 'COMP-002', isPlatformAdmin: false }
+
+  test('a project manager working in the project\'s company manages it', async () => {
+    assert.equal(await canManage(comp002Member, 'PRJ-037'), true)
+  })
+
+  test('a manager assignment left over from before the split does not cross companies', async () => {
+    const deps = fakeDeps()
+    assert.equal(await canManage(comp001Member, 'PRJ-037', deps), false)
+    assert.ok(!deps.calls.some(([name]) => name === 'getProjectRole' || name === 'canAdminCompany'))
+  })
+
+  test('the same manager is let back in once they work in the project\'s company', async () => {
+    assert.equal(await canManage({ ...comp001Member, companyId: 'COMP-002' }, 'PRJ-037'), true)
+  })
+
+  test('a team leader, a member and a non-member do not manage', async () => {
+    assert.equal(await canManage(comp001Member, 'PRJ-001'), false)
+    assert.equal(await canManage({ ...comp002Member, employeeId: 'SF-0009' }, 'PRJ-037'), false)
+  })
+
+  test('a company admin manages every project of their company without a project role', async () => {
+    const deps = fakeDeps()
+    assert.equal(await canManage(swargAdmin, 'PRJ-037', deps), true)
+    assert.ok(!deps.calls.some(([name]) => name === 'getProjectRole'))
+    // The legacy global admin role counts inside the company they belong to.
+    assert.equal(await canManage(companyAdmin, 'PRJ-001'), true)
+  })
+
+  test('an admin of the project\'s company is refused while working in another company', async () => {
+    assert.equal(await canManage({ ...swargAdmin, companyId: 'COMP-001' }, 'PRJ-037'), false)
+    assert.equal(await canManage(companyAdmin, 'PRJ-037'), false)
+    assert.equal(await canManage(companyAdmin, 'PRJ-050'), false)
+  })
+
+  test('a platform admin manages every company\'s project', async () => {
+    for (const projectId of ['PRJ-001', 'PRJ-037', 'PRJ-050']) {
+      assert.equal(await canManage(platformAdmin, projectId), true, projectId)
+      assert.equal(await canManage(platformAdminInComp002, projectId), true, projectId)
+    }
+  })
+
+  test('a project with no company is managed by its manager only — no global-role shortcut', async () => {
+    assert.equal(await canManage(comp001Member, 'PRJ-LEGACY'), true)
+    assert.equal(await canManage(companyAdmin, 'PRJ-LEGACY'), false)
+  })
+
+  test('a token with no company falls back to the pre-tenancy rules', async () => {
+    assert.equal(await canManage(pre062Token, 'PRJ-037'), true)
+    assert.equal(await canManage(pre062Token, 'PRJ-001'), false)
+  })
+
+  test('an unknown project is refused before any other lookup', async () => {
+    const deps = fakeDeps()
+    assert.equal(await canManage(platformAdmin, 'PRJ-NOPE', deps), false)
+    assert.deepEqual(deps.calls, [['getProjectCompanyId', 'PRJ-NOPE']])
   })
 })
