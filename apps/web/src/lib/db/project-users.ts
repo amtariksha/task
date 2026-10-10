@@ -8,6 +8,7 @@
  */
 
 import { query, queryOne, withRetry } from './config'
+import { countMemberArtifacts } from '../projects/member-artifact-counts'
 
 interface ProjectUserRow {
   id: number
@@ -294,22 +295,5 @@ export async function getUserArtifactCounts(
   projectId: string,
   employeeId: string
 ): Promise<{ taskCount: number; bugCount: number }> {
-  return withRetry(async () => {
-    const taskResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM tasks
-       WHERE project_id = $1 AND $2 = ANY(assigned_to)`,
-      [projectId, employeeId]
-    )
-
-    const bugResult = await queryOne<{ count: string }>(
-      `SELECT COUNT(*) as count FROM bugs
-       WHERE project_id = $1 AND assigned_to = $2`,
-      [projectId, employeeId]
-    )
-
-    return {
-      taskCount: parseInt(taskResult?.count || '0', 10),
-      bugCount: parseInt(bugResult?.count || '0', 10),
-    }
-  })
+  return withRetry(() => countMemberArtifacts(projectId, employeeId, { queryOne }))
 }
