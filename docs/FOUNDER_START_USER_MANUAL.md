@@ -1196,7 +1196,7 @@ You always work in one company at a time (the web navbar switcher, or drawer →
 | What | Who sees what |
 |------|---------------|
 | Web **Work** → **Tasks** and **Work** → **Development** (the bugs list), and the web **Your Work** and **Team Tasks** pages | Only tasks and bugs of the company you are working in, plus old items that have no company. This holds for everyone, platform admins and founders included. Switch company to see another company's. |
-| **Projects** (web **Admin** → **Projects**, mobile **Projects**) | A platform admin sees every company's projects without switching. Everyone else sees only the company they are working in: all its projects if they administer it, otherwise only the projects they are assigned to. This is about the lists: a web project page opened from a direct link is not checked against the company (see below). |
+| **Projects** (web **Admin** → **Projects**, mobile **Projects**) | A platform admin sees every company's projects without switching. Everyone else sees only the company they are working in: all its projects if they administer it, otherwise only the projects they are assigned to. |
 | **Project \*** in **Create Task** | Only main projects you are assigned to, for every role. Unless you are a platform admin, also only those of the company you are working in. |
 | Opening one task or bug (a link, a list row, a notification) | The item must belong to the company you are working in, or have no company, or you must be a platform admin. Then you also need one of: the global role admin or top_management; being its assignee, assigner or supporter (for a bug: its reporter or assignee); or being a member of its project. Being a platform admin only crosses the company boundary. It grants nothing else. |
 | A project's requirements and secrets | Platform admins in any company. Everyone else only while working in the project's company. See [Project roles](#project-roles) and [Project secrets](#project-secrets). |
@@ -1207,8 +1207,8 @@ You always work in one company at a time (the web navbar switcher, or drawer →
 
 What this means in practice:
 
-- Someone who is not a platform admin and is working in Amtariksha (COMP-001) cannot open Swarg (COMP-002) or Tattva Silicon (COMP-003) tasks, bugs, requirements or secrets, and does not see their projects, tasks or bugs in the web lists. A project assignment left over from before the split does not help there, because the company is checked before project membership. Being a global admin or top_management user does not help either.
-- Three things still get through for that person. A web project page opens from a direct link (for example `/projects/PRJ-037`) for any signed-in user, and shows the project's name, description, sub-projects and members. Someone still set as that project's **Manager** can edit it and its members. And on the phone, **Tasks**, **Your Work** and Home still list the person's own tasks from every company, though opening one is refused.
+- Someone who is not a platform admin and is working in Amtariksha (COMP-001) cannot open Swarg (COMP-002) or Tattva Silicon (COMP-003) projects, tasks, bugs, requirements or secrets, and does not see their projects, tasks or bugs in the web lists. A project page opened from a direct link (for example `/projects/PRJ-037`) shows **You can’t open this project**. A project assignment left over from before the split does not help there, even as that project's **Manager**, because the company is checked before project membership and project role. Being a global admin or top_management user does not help either.
+- One thing still gets through for that person: on the phone, **Tasks**, **Your Work** and Home still list the person's own tasks from every company, though opening one is refused.
 - As a platform admin you see every company's projects, but the web **Tasks** and **Development** lists and the mobile **Development** list show only the company you are working in. From Amtariksha you see Swarg and Tattva Silicon tasks and bugs in **Waiting on you** on Start (when they are yours), in the mobile **Tasks**, **Your Work** and Home lists (your own tasks only), and by opening one directly.
 - A new task or bug takes the company of its project. A platform admin working in Amtariksha can file a task in a Swarg project, but the task list they return to does not show it. Switch to Swarg to see it.
 
@@ -1234,7 +1234,7 @@ COMP-001 Amtariksha kept everything except two project trees. COMP-002 Swarg (co
 
 The split moved nobody. On 2026-09-29 all 21 people were members of COMP-001 only, and the split did not touch memberships or project assignments. This manual cannot see who has been added since; step 1 below shows today's state.
 
-Until a Swarg or Tattva Silicon person has been added to that company and has switched to it, they do not see that company's tasks, bugs or projects in the web lists, and cannot open its tasks, bugs, requirements or secrets. A project page still opens from a direct link (see [What you see in each company](#what-you-see-in-each-company)). You must switch to Swarg or Tattva Silicon yourself to see their tasks and bugs in the web **Tasks** and **Development** lists, and the switcher lists only companies you are a member of. Start is not affected.
+Until a Swarg or Tattva Silicon person has been added to that company and has switched to it, they do not see that company's tasks, bugs or projects in the web lists, and cannot open its projects, tasks, bugs, requirements or secrets. You must switch to Swarg or Tattva Silicon yourself to see their tasks and bugs in the web **Tasks** and **Development** lists, and the switcher lists only companies you are a member of. Start is not affected.
 
 To set it up:
 
