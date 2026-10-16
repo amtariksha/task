@@ -42,6 +42,7 @@ import {
   Moon,
   Sunrise,
   Building2,
+  Rocket,
 } from 'lucide-react'
 
 interface MeIsFounderData { me: { employeeId: string; isFounder: boolean | null } | null }
@@ -146,6 +147,8 @@ export default function Navbar() {
         // Requirements sits alongside Development; visible to all members (any
         // project member may view a project's requirements — see filter below).
         { label: 'Requirements', href: '/requirements', icon: FileText, key: 'requirements' },
+        // Releases: store versions of the company's apps, visible to every member.
+        { label: 'Releases', href: '/releases', icon: Rocket, key: 'releases' },
       ]
     },
     {
@@ -194,7 +197,7 @@ export default function Navbar() {
           // 'company' is not a tab permission: everyone who belongs to a company
           // may see who else is in it, and the page itself only offers the
           // management controls to a company admin (the API enforces it).
-          : child.key === 'company' || child.key === 'requirements'
+          : child.key === 'company' || child.key === 'requirements' || child.key === 'releases'
             ? true
             : (child.key ? hasTabAccess(currentUser, child.key) : true)
       )
