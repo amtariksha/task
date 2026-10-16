@@ -7,7 +7,7 @@ import Navbar from '@/components/layout/Navbar'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import ReleaseAppCard, { type ManualVersionValues } from '@/components/releases/ReleaseAppCard'
 import ReleaseAppForm, { type ReleaseAppFormValues } from '@/components/releases/ReleaseAppForm'
-import { getCurrentUser } from '@/lib/auth'
+import { getCurrentUser, logout } from '@/lib/auth'
 import type { ReleaseAppSummary } from '@/lib/releases/types'
 
 async function api(path: string, init?: RequestInit) {
@@ -24,8 +24,11 @@ async function api(path: string, init?: RequestInit) {
     },
   })
   const json = await res.json().catch(() => ({}))
+  if (res.status === 401) json.error = SESSION_EXPIRED
   return { ok: res.ok, status: res.status, json }
 }
+
+const SESSION_EXPIRED = 'Your session has expired. Sign in again.'
 
 type Mode = { kind: 'list' } | { kind: 'add' } | { kind: 'edit'; app: ReleaseAppSummary }
 
@@ -42,6 +45,11 @@ export default function ReleasesPage() {
     setLoading(true)
     const { ok, status, json } = await api('/api/releases/apps')
     if (status === 401) {
+      // The auth cookie lasts 7 days but the stored user does not, so the app
+      // can look signed in with no session. Sending the user to '/' would bounce
+      // them straight back to /dashboard (it only checks the stored user), so
+      // clear both and show the login screen instead.
+      await logout()
       router.push('/')
       return
     }
