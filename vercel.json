@@ -22,6 +22,10 @@
     {
       "path": "/api/cron/founder-start",
       "schedule": "30 3 * * *"
+    },
+    {
+      "path": "/api/cron/release-versions",
+      "schedule": "0 4 * * *"
     }
   ]
 }
